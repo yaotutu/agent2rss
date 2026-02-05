@@ -8,6 +8,16 @@
         "elysia": "^1.1.29",
         "feed": "^4.2.2",
         "markdown-it": "^14.1.0",
+        "markdown-it-abbr": "^2.0.0",
+        "markdown-it-attrs": "^4.3.1",
+        "markdown-it-deflist": "^3.0.0",
+        "markdown-it-emoji": "^3.0.0",
+        "markdown-it-footnote": "^4.0.0",
+        "markdown-it-highlightjs": "^4.2.0",
+        "markdown-it-ins": "^4.0.0",
+        "markdown-it-mark": "^4.0.0",
+        "markdown-it-sub": "^2.0.0",
+        "markdown-it-sup": "^2.0.0",
       },
       "devDependencies": {
         "@types/markdown-it": "^14.1.2",
@@ -55,11 +65,33 @@
 
     "file-type": ["file-type@21.3.0", "https://registry.npmmirror.com/file-type/-/file-type-21.3.0.tgz", { "dependencies": { "@tokenizer/inflate": "^0.4.1", "strtok3": "^10.3.4", "token-types": "^6.1.1", "uint8array-extras": "^1.4.0" } }, "sha512-8kPJMIGz1Yt/aPEwOsrR97ZyZaD1Iqm8PClb1nYFclUCkBi0Ma5IsYNQzvSFS9ib51lWyIw5mIT9rWzI/xjpzA=="],
 
+    "highlight.js": ["highlight.js@11.11.1", "https://registry.npmmirror.com/highlight.js/-/highlight.js-11.11.1.tgz", {}, "sha512-Xwwo44whKBVCYoliBQwaPvtd/2tYFkRQtXDWj1nackaV2JPXx3L0+Jvd8/qCJ2p+ML0/XVkJ2q+Mr+UVdpJK5w=="],
+
     "ieee754": ["ieee754@1.2.1", "https://registry.npmmirror.com/ieee754/-/ieee754-1.2.1.tgz", {}, "sha512-dcyqhDvX1C46lXZcVqCpK+FtMRQVdIMN6/Df5js2zouUsqG7I6sFxitIC+7KYK29KdXOLHdu9zL4sFnoVQnqaA=="],
 
     "linkify-it": ["linkify-it@5.0.0", "https://registry.npmmirror.com/linkify-it/-/linkify-it-5.0.0.tgz", { "dependencies": { "uc.micro": "^2.0.0" } }, "sha512-5aHCbzQRADcdP+ATqnDuhhJ/MRIqDkZX5pyjFHRRysS8vZ5AbqGEoFIb6pYHPZ+L/OC2Lc+xT8uHVVR5CAK/wQ=="],
 
     "markdown-it": ["markdown-it@14.1.0", "https://registry.npmmirror.com/markdown-it/-/markdown-it-14.1.0.tgz", { "dependencies": { "argparse": "^2.0.1", "entities": "^4.4.0", "linkify-it": "^5.0.0", "mdurl": "^2.0.0", "punycode.js": "^2.3.1", "uc.micro": "^2.1.0" }, "bin": { "markdown-it": "bin/markdown-it.mjs" } }, "sha512-a54IwgWPaeBCAAsv13YgmALOF1elABB08FxO9i+r4VFk5Vl4pKokRPeX8u5TCgSsPi6ec1otfLjdOpVcgbpshg=="],
+
+    "markdown-it-abbr": ["markdown-it-abbr@2.0.0", "https://registry.npmmirror.com/markdown-it-abbr/-/markdown-it-abbr-2.0.0.tgz", {}, "sha512-of7C8pXSjXjDojW4neNP+jD7inUYH/DO0Ca+K/4FUEccg0oHAEX/nfscw0jfz66PJbYWOAT9U8mjO21X5p6aAw=="],
+
+    "markdown-it-attrs": ["markdown-it-attrs@4.3.1", "https://registry.npmmirror.com/markdown-it-attrs/-/markdown-it-attrs-4.3.1.tgz", { "peerDependencies": { "markdown-it": ">= 9.0.0" } }, "sha512-/ko6cba+H6gdZ0DOw7BbNMZtfuJTRp9g/IrGIuz8lYc/EfnmWRpaR3CFPnNbVz0LDvF8Gf1hFGPqrQqq7De0rg=="],
+
+    "markdown-it-deflist": ["markdown-it-deflist@3.0.0", "https://registry.npmmirror.com/markdown-it-deflist/-/markdown-it-deflist-3.0.0.tgz", {}, "sha512-OxPmQ/keJZwbubjiQWOvKLHwpV2wZ5I3Smc81OjhwbfJsjdRrvD5aLTQxmZzzePeO0kbGzAo3Krk4QLgA8PWLg=="],
+
+    "markdown-it-emoji": ["markdown-it-emoji@3.0.0", "https://registry.npmmirror.com/markdown-it-emoji/-/markdown-it-emoji-3.0.0.tgz", {}, "sha512-+rUD93bXHubA4arpEZO3q80so0qgoFJEKRkRbjKX8RTdca89v2kfyF+xR3i2sQTwql9tpPZPOQN5B+PunspXRg=="],
+
+    "markdown-it-footnote": ["markdown-it-footnote@4.0.0", "https://registry.npmmirror.com/markdown-it-footnote/-/markdown-it-footnote-4.0.0.tgz", {}, "sha512-WYJ7urf+khJYl3DqofQpYfEYkZKbmXmwxQV8c8mO/hGIhgZ1wOe7R4HLFNwqx7TjILbnC98fuyeSsin19JdFcQ=="],
+
+    "markdown-it-highlightjs": ["markdown-it-highlightjs@4.2.0", "https://registry.npmmirror.com/markdown-it-highlightjs/-/markdown-it-highlightjs-4.2.0.tgz", { "dependencies": { "highlight.js": "^11.9.0" } }, "sha512-NC7pXE8KkOl6xWJVRNt8p6wgJVznXKsE0HgYGdk6DD2tn1l4L9f0ALf3VIoGVkotNU1uGQatSxfBF1zZPUMmuQ=="],
+
+    "markdown-it-ins": ["markdown-it-ins@4.0.0", "https://registry.npmmirror.com/markdown-it-ins/-/markdown-it-ins-4.0.0.tgz", {}, "sha512-sWbjK2DprrkINE4oYDhHdCijGT+MIDhEupjSHLXe5UXeVr5qmVxs/nTUVtgi0Oh/qtF+QKV0tNWDhQBEPxiMew=="],
+
+    "markdown-it-mark": ["markdown-it-mark@4.0.0", "https://registry.npmmirror.com/markdown-it-mark/-/markdown-it-mark-4.0.0.tgz", {}, "sha512-YLhzaOsU9THO/cal0lUjfMjrqSMPjjyjChYM7oyj4DnyaXEzA8gnW6cVJeyCrCVeyesrY2PlEdUYJSPFYL4Nkg=="],
+
+    "markdown-it-sub": ["markdown-it-sub@2.0.0", "https://registry.npmmirror.com/markdown-it-sub/-/markdown-it-sub-2.0.0.tgz", {}, "sha512-iCBKgwCkfQBRg2vApy9vx1C1Tu6D8XYo8NvevI3OlwzBRmiMtsJ2sXupBgEA7PPxiDwNni3qIUkhZ6j5wofDUA=="],
+
+    "markdown-it-sup": ["markdown-it-sup@2.0.0", "https://registry.npmmirror.com/markdown-it-sup/-/markdown-it-sup-2.0.0.tgz", {}, "sha512-5VgmdKlkBd8sgXuoDoxMpiU+BiEt3I49GItBzzw7Mxq9CxvnhE/k09HFli09zgfFDRixDQDfDxi0mgBCXtaTvA=="],
 
     "mdurl": ["mdurl@2.0.0", "https://registry.npmmirror.com/mdurl/-/mdurl-2.0.0.tgz", {}, "sha512-Lf+9+2r+Tdp5wXDXC4PcIBjTDtq4UKjCPMQhKIuzpJNW0b96kVqSwW0bT7FhRSfmAiFYgP+SCRvdrDozfh0U5w=="],
 
