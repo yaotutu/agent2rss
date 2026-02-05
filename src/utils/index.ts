@@ -1,4 +1,4 @@
-import { randomUUID } from 'crypto';
+import { randomUUID, randomBytes } from 'crypto';
 import { networkInterfaces } from 'os';
 
 /**
@@ -6,6 +6,14 @@ import { networkInterfaces } from 'os';
  */
 export function generateId(): string {
   return randomUUID();
+}
+
+/**
+ * 生成频道密钥
+ * 格式：ch_ + 32位随机十六进制字符串
+ */
+export function generateChannelToken(): string {
+  return 'ch_' + randomBytes(16).toString('hex');
 }
 
 /**

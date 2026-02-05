@@ -48,6 +48,7 @@ export interface Channel {
   theme?: string;                // 主题 (默认使用全局配置)
   maxPosts?: number;             // 最大文章数 (默认使用全局配置)
   language?: string;             // 语言 (默认: zh-CN)
+  token: string;                 // 频道密钥 (用于鉴权)
   createdAt: Date;
   updatedAt: Date;
 }
