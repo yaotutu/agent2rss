@@ -1,0 +1,22 @@
+{
+  "name": "agent2rss",
+  "version": "1.0.0",
+  "description": "A high-performance RSS microservice powered by Bun and ElysiaJS",
+  "type": "module",
+  "scripts": {
+    "dev": "bun run --watch src/index.ts",
+    "start": "bun run src/index.ts"
+  },
+  "dependencies": {
+    "elysia": "^1.1.29",
+    "feed": "^4.2.2",
+    "markdown-it": "^14.1.0"
+  },
+  "devDependencies": {
+    "@types/markdown-it": "^14.1.2",
+    "bun-types": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5.0.0"
+  }
+}
