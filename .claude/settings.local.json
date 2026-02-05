@@ -2,7 +2,13 @@
   "permissions": {
     "allow": [
       "Bash(curl:*)",
-      "Bash(pkill:*)"
+      "Bash(pkill:*)",
+      "Bash(tree:*)",
+      "Bash(bun run build:*)",
+      "Bash(bun run tsc --noEmit)",
+      "Bash(timeout 5 bun run:*)",
+      "Bash(bun build:*)",
+      "Bash(chmod:*)"
     ]
   }
 }
