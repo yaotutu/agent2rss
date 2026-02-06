@@ -1,0 +1,15 @@
+{
+  "serverUrl": "http://192.168.123.100:8765",
+  "currentChannelId": "1fc5ce63-e763-4600-9e8c-5aa01a21071e",
+  "channels": [
+    {
+      "id": "1fc5ce63-e763-4600-9e8c-5aa01a21071e",
+      "name": "yaotutu的AI情报局",
+      "description": "Claude 创建的 RSS 频道",
+      "token": "ch_a389171f7dee8921fd153f95099dc01b",
+      "webhookUrl": "http://192.168.123.100:8765/api/channels/1fc5ce63-e763-4600-9e8c-5aa01a21071e/webhook",
+      "rssUrl": "http://192.168.123.100:8765/channels/1fc5ce63-e763-4600-9e8c-5aa01a21071e/rss.xml",
+      "createdAt": "2026-02-06T04:09:00Z"
+    }
+  ]
+}

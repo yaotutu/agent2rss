@@ -10,7 +10,7 @@ description: Agent2RSS 服务客户端，帮助用户管理 RSS 频道和推送�
 ## 配置管理
 
 ### 配置文件位置
-`~/.claude/skills/agent2rss-client/config.json`
+`config.json`（位于技能目录下，随项目保存）
 
 ### 配置文件结构
 ```json
@@ -253,14 +253,14 @@ curl -X POST {webhookUrl} \
 ### Read 工具
 用于读取配置文件：
 ```
-Read(file_path="~/.claude/skills/agent2rss-client/config.json")
+Read(file_path="config.json")
 ```
 
 ### Write 工具
 用于保存配置文件：
 ```
 Write(
-  file_path="~/.claude/skills/agent2rss-client/config.json",
+  file_path="config.json",
   content=json.dumps(config, indent=2)
 )
 ```
