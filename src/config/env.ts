@@ -5,7 +5,7 @@ import { z } from 'zod';
  */
 const envSchema = z.object({
   PORT: z.string().regex(/^\d+$/).transform(Number).default('8765'),
-  AUTH_TOKEN: z.string().min(16, 'AUTH_TOKEN 必须至少 16 个字符'),
+  AUTH_TOKEN: z.string().min(1, 'AUTH_TOKEN 不能为空'),
   FEED_URL: z.string().url('FEED_URL 必须是有效的 URL'),
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
   NODE_ENV: z.enum(['development', 'production']).default('development'),
@@ -25,12 +25,14 @@ export function validateEnv(): Env {
     return envSchema.parse(process.env);
   } catch (error) {
     console.error('❌ 环境变量验证失败:');
-    if (error instanceof z.ZodError) {
-      error.errors.forEach((err) => {
+    console.error('错误类型:', typeof error, error?.constructor?.name);
+    console.error('完整错误:', error);
+
+    if (error && typeof error === 'object' && 'errors' in error) {
+      const zodError = error as z.ZodError;
+      zodError.errors.forEach((err) => {
         console.error(`  - ${err.path.join('.')}: ${err.message}`);
       });
-    } else {
-      console.error(error);
     }
     console.error('\n请检查 .env 文件配置');
     process.exit(1);
