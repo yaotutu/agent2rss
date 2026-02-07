@@ -7,6 +7,33 @@ description: Agent2RSS 服务客户端，帮助用户管理 RSS 频道和推送�
 
 这是一个轻量级技能，帮助 Claude 使用 Agent2RSS 服务管理 RSS 频道和推送内容。
 
+## ⚡ 快速参考
+
+### 认证方式（重要！）
+Agent2RSS API 使用 **非标准** 的认证方式：
+- ✅ 正确：`-H "x-auth-token: ch_xxx..."`
+- ❌ 错误：`-H "Authorization: Bearer ch_xxx..."`
+
+### 快速推送内容
+```bash
+curl -X POST "{webhookUrl}" \
+  -H "Content-Type: application/json" \
+  -H "x-auth-token: {token}" \
+  -d '{
+    "title": "文章标题",
+    "content": "文章内容（支持 Markdown）",
+    "link": "https://example.com/article",
+    "contentType": "markdown"
+  }'
+```
+
+### 常见错误
+| 错误信息 | 原因 | 解决方案 |
+|---------|------|---------|
+| `Invalid token` | 使用了错误的认证头 | 使用 `x-auth-token` 而不是 `Authorization` |
+| `Channel not found` | 频道 ID 不存在 | 检查 config.json 中的 currentChannelId |
+| `Missing required fields` | 缺少必填字段 | 确保包含 title 和 content 字段 |
+
 ## 配置管理
 
 ### 配置文件位置
