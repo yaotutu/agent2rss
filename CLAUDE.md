@@ -40,11 +40,11 @@ curl -X POST http://localhost:8765/api/channels \
   -H "Content-Type: application/json" \
   -d '{"name":"测试频道","description":"测试描述"}'
 
-# 发布文章到频道
-curl -X POST http://localhost:8765/api/channels/{channel-id}/webhook \
+# 发布文章到频道（使用标准 Bearer Token 认证）
+curl -X POST http://localhost:8765/api/channels/{channel-id}/posts \
   -H "Content-Type: application/json" \
-  -H "x-auth-token: {channel-token}" \
-  -d '{"title":"测试文章","content":"# 标题\n内容..."}'
+  -H "Authorization: Bearer {channel-token}" \
+  -d '{"content":"# 标题\n内容...","title":"测试文章"}'
 
 # 获取频道 RSS Feed
 curl http://localhost:8765/channels/{channel-id}/rss.xml
@@ -56,8 +56,9 @@ curl http://localhost:8765/channels/{channel-id}/rss.xml
 
 **发布文章流程**:
 ```
-POST /api/channels/:channelId/webhook
-  → 鉴权验证 (services/auth.ts)
+POST /api/channels/:channelId/posts
+  → 鉴权验证 (Authorization: Bearer token, services/auth.ts)
+  → 频道验证 (检查频道是否存在)
   → 内容处理 (services/markdown.ts)
   → 主题应用 (services/theme.ts)
   → 数据存储 (services/storage.ts → SQLite)
@@ -147,6 +148,53 @@ src/
 
 **重要**: 启动时会自动验证环境变量，失败则退出进程。
 
+## API 接口规范
+
+### 核心接口
+
+| 方法 | 端点 | 鉴权 | 说明 |
+|------|------|------|------|
+| POST | `/api/channels/:channelId/posts` | ✅ | 创建文章（AI 友好，title 可选） |
+| GET | `/channels/:id/rss.xml` | ❌ | 获取频道 RSS Feed |
+| GET | `/api/channels` | ❌ | 获取所有频道列表 |
+| GET | `/api/channels/:id` | ❌ | 获取单个频道详情 |
+| POST | `/api/channels` | ⚠️ | 创建频道（私有模式需超级管理员 Token） |
+| PUT | `/api/channels/:id` | ✅ | 更新频道配置 |
+| DELETE | `/api/channels/:id` | ✅ | 删除频道 |
+
+### 认证方式
+
+**标准 Bearer Token 认证**（推荐）:
+```bash
+Authorization: Bearer ch_xxx...        # 频道 Token
+Authorization: Bearer {AUTH_TOKEN}     # 超级管理员 Token
+```
+
+### 创建文章示例
+
+**最简单的调用**（仅内容，标题自动提取）:
+```bash
+curl -X POST "http://localhost:8765/api/channels/default/posts" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer ch_xxx..." \
+  -d '{"content": "# 我的标题\n\n这是文章内容"}'
+```
+
+**完整参数调用**:
+```bash
+curl -X POST "http://localhost:8765/api/channels/default/posts" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer ch_xxx..." \
+  -d '{
+    "content": "# 标题\n\n内容...",
+    "title": "自定义标题",
+    "link": "https://example.com/article",
+    "contentType": "markdown",
+    "author": "作者名",
+    "tags": ["技术", "教程"]
+  }'
+```
+
 ## 开发注意事项
 
 ### 数据库操作
@@ -160,9 +208,13 @@ src/
 - 默认频道 `default` 不能删除（在 `deleteChannel()` 中硬编码保护）
 
 ### 鉴权逻辑
-- Webhook 请求必须在 Header 中提供 `x-auth-token`
+- **标准认证方式**: 使用 `Authorization: Bearer <token>` 格式
+- **双层鉴权**:
+  - 超级管理员 Token (`AUTH_TOKEN` 环境变量) - 全局权限
+  - 频道 Token (创建频道时生成，格式 `ch_xxx`) - 频道级权限
 - 私有模式 (`CHANNEL_CREATION_MODE=private`) 下，创建频道需要超级管理员 Token
 - 更新/删除频道需要频道 Token 或超级管理员 Token
+- 发布文章需要频道 Token 或超级管理员 Token
 
 ### 主题开发
 - 主题配置在 `themes.json` 中定义
@@ -170,10 +222,13 @@ src/
 - 添加新主题后需要重启服务（主题在启动时加载）
 
 ### 内容处理
-- 支持 Markdown 和 HTML 两种输入格式
+- **必填字段**: `content`（文章内容，支持 Markdown 和 HTML）
+- **可选字段**: `title`（标题，未提供则自动从 Markdown 第一个 # 标题提取）
+- 支持 Markdown 和 HTML 两种输入格式，可指定 `contentType` 或自动检测
 - Markdown 会自动应用主题样式
 - HTML 内容直接存储，不做额外处理
 - 摘要自动从 HTML 提取前 N 个字符（去除标签）
+- 链接未提供时自动生成内部永久链接：`{FEED_URL}/channels/{channelId}/posts/{postId}`
 
 ### 错误处理
 - 使用 Elysia 的全局错误处理器统一响应格式
@@ -186,6 +241,12 @@ src/
 - 所有请求自动记录（method, url）
 
 ## 常见任务
+
+### 测试文章发布功能
+1. 创建测试频道或使用现有频道 ID
+2. 获取频道 Token（创建时返回，或使用超级管理员 Token 查询）
+3. 使用 `Authorization: Bearer` 头发送 POST 请求到 `/api/channels/:channelId/posts`
+4. 验证 RSS Feed 是否包含新文章：访问 `/channels/:channelId/rss.xml`
 
 ### 添加新的 API 端点
 1. 在 `src/routes/index.ts` 中添加路由
@@ -234,8 +295,11 @@ sudo systemctl start agent2rss
 
 ## 文档资源
 
-- API 文档: `http://localhost:8765/swagger`
-- 架构说明: `docs/ARCHITECTURE.md`
-- 多频道指南: `docs/MULTI_CHANNEL.md`
-- API 参考: `docs/API.md`
-- 项目结构: `docs/PROJECT_STRUCTURE.md`
+- **API 文档**: `http://localhost:8765/swagger`（服务运行时访问）
+- **架构说明**: `docs/ARCHITECTURE.md` - 模块化架构详解
+- **多频道指南**: `docs/MULTI_CHANNEL.md` - 多频道使用完整指南
+- **API 参考**: `docs/API.md` - API 接口详细说明
+- **项目结构**: `docs/PROJECT_STRUCTURE.md` - 目录结构和模块关系
+- **AI 快速开始**: `docs/AI_QUICK_START.md` - AI Agent 集成指南
+- **故障排除**: `docs/TROUBLESHOOTING.md` - 常见问题解决方案
+- **AI 内容链接**: `docs/AI_CONTENT_LINKS.md` - AI 生成内容的链接处理方案
