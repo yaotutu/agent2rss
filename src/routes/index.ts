@@ -13,7 +13,7 @@ import {
   deleteChannel
 } from '../services/storage.js';
 import { markdownToHtml } from '../services/markdown.js';
-import { generateSummary, generateId, generateChannelToken } from '../utils/index.js';
+import { generateSummary, generateId, generateChannelToken, extractTitleFromMarkdown } from '../utils/index.js';
 import { verifyToken } from '../services/auth.js';
 import { getDatabase } from '../services/database.js';
 
@@ -47,7 +47,7 @@ export function createRoutes() {
   // 全局错误处理
   // ============================================================
 
-  app.onError(({ error, code, set }) => {
+  app.onError(async ({ error, code, set }) => {
     if (code === 'VALIDATION') {
       set.status = 422;
       return { success: false, error: '请求参数验证失败', details: error };
@@ -56,6 +56,44 @@ export function createRoutes() {
     if (code === 'NOT_FOUND') {
       set.status = 404;
       return { success: false, error: '资源不存在' };
+    }
+
+    // 新增：识别 PARSE 错误（JSON 解析失败）
+    if (code === 'PARSE') {
+      // 导入 logger 记录详细错误
+      try {
+        const { default: logger } = await import('../services/logger.js');
+        logger.error({
+          error: error.message,
+          code,
+          timestamp: new Date().toISOString()
+        }, 'JSON parse error');
+      } catch (logError) {
+        console.error('Failed to log parse error:', logError);
+      }
+
+      set.status = 400;
+      return {
+        success: false,
+        error: '请求体解析失败',
+        details: {
+          type: 'JSON_PARSE_ERROR',
+          message: '无法解析请求体中的 JSON 数据',
+          commonCauses: [
+            'JSON 格式不正确（缺少引号、括号不匹配等）',
+            '在命令行直接使用多行 JSON 时，shell 对特殊字符的处理',
+            'Content-Type 不是 application/json',
+            '请求体为空'
+          ],
+          solutions: [
+            '使用文件方式传递 JSON：curl -d @payload.json',
+            '确保 Content-Type: application/json',
+            '使用 JSON 验证工具检查格式：jq . payload.json',
+            '考虑使用 CLI 工具：bun run cli push'
+          ],
+          example: 'curl -X POST "http://localhost:8765/api/channels/xxx/webhook" -H "Content-Type: application/json" -d @payload.json'
+        }
+      };
     }
 
     console.error('请求处理失败:', error);
@@ -101,16 +139,24 @@ export function createRoutes() {
   app.get('/', () => ({
     message: 'Agent2RSS Service',
     version: '2.0.0',
-    features: ['Multi-channel RSS feeds', 'Swagger API Documentation'],
+    features: ['AI-friendly API', 'Multi-channel RSS feeds', 'Swagger Documentation'],
     endpoints: {
       swagger: 'GET /swagger',
       health: 'GET /health',
-      webhook: 'POST /api/channels/:channelId/webhook',
-      channelRss: 'GET /channels/:id/rss.xml',
-      channels: 'GET /api/channels',
+      createPost: 'POST /api/channels/:channelId/posts',
+      getChannelFeed: 'GET /channels/:id/rss.xml',
+      listChannels: 'GET /api/channels',
+      getChannel: 'GET /api/channels/:id',
       createChannel: 'POST /api/channels',
       updateChannel: 'PUT /api/channels/:id',
       deleteChannel: 'DELETE /api/channels/:id',
+    },
+    authentication: {
+      required: 'Authorization: Bearer <token>',
+      tokenTypes: {
+        channel: 'ch_xxx (for specific channel)',
+        admin: 'AUTH_TOKEN (super admin, for all channels)'
+      }
     }
   }), {
     detail: {
@@ -122,12 +168,28 @@ export function createRoutes() {
 
   // ============================================================
   // Webhook - 频道专属接收内容
+// ============================================================
+  // 创建文章 - AI 友好的统一接口
   // ============================================================
 
-  app.post('/api/channels/:channelId/webhook', async ({ params, body, headers, set }): Promise<ApiResponse> => {
-    // 鉴权检查
-    const authToken = headers['x-auth-token'];
+  app.post('/api/channels/:channelId/posts', async ({ params, body, headers, set }): Promise<ApiResponse> => {
     const channelId = params.channelId;
+
+    // 鉴权检查 - 使用标准 Authorization: Bearer
+    const authHeader = headers['authorization'];
+    const authToken = authHeader?.replace('Bearer ', '');
+
+    if (!authToken) {
+      set.status = 401;
+      return {
+        success: false,
+        error: 'Authorization header missing or invalid',
+        details: {
+          expected: 'Authorization: Bearer <token>',
+          help: 'Provide a channel token (ch_xxx) or admin AUTH_TOKEN'
+        }
+      };
+    }
 
     // 验证 token
     const authResult = await verifyToken(authToken, channelId);
@@ -135,7 +197,8 @@ export function createRoutes() {
       set.status = 401;
       return {
         success: false,
-        error: authResult.error || 'Unauthorized'
+        error: authResult.error || 'Unauthorized',
+        details: authResult.details
       };
     }
 
@@ -143,11 +206,49 @@ export function createRoutes() {
     const channel = await readChannel(channelId);
     if (!channel) {
       set.status = 404;
-      return { success: false, error: `Channel "${channelId}" not found` };
+      return {
+        success: false,
+        error: `Channel "${channelId}" not found`,
+        details: {
+          channelId,
+          help: 'Use GET /api/channels to list all available channels'
+        }
+      };
+    }
+
+    // 验证必需字段
+    if (!body.content) {
+      set.status = 400;
+      return {
+        success: false,
+        error: 'Missing required field: content',
+        details: {
+          field: 'content',
+          issue: 'Required field missing',
+          provided: body,
+          expected: { content: 'string (required)' },
+          example: { content: '# My Article\n\nContent here...' }
+        }
+      };
+    }
+
+    // 自动提取标题（如果未提供）
+    let title = body.title;
+    if (!title) {
+      title = extractTitleFromMarkdown(body.content);
+    }
+    if (!title) {
+      title = 'Untitled Post';
+    }
+
+    // 内容类型自动检测或使用指定值
+    let contentType = body.contentType || 'auto';
+    if (contentType === 'auto') {
+      // 简单的启发式检测：如果包含 HTML 标签，则认为是 HTML
+      contentType = body.content.trimStart().startsWith('<') ? 'html' : 'markdown';
     }
 
     // 内容处理
-    const contentType = body.contentType || 'markdown';
     const theme = body.theme || channel.theme || CONFIG.content.defaultTheme;
     const html = contentType === 'html'
       ? body.content
@@ -161,15 +262,25 @@ export function createRoutes() {
     // 自动生成链接（如果未提供）
     const postLink = body.link || `${CONFIG.feed.url}/channels/${channelId}/posts/${postId}`;
 
+    // 处理标签（支持字符串或数组）
+    let tags: string[] | undefined = undefined;
+    if (body.tags) {
+      if (Array.isArray(body.tags)) {
+        tags = body.tags;
+      } else if (typeof body.tags === 'string') {
+        tags = body.tags.split(',').map(t => t.trim()).filter(t => t);
+      }
+    }
+
     // 创建新文章
     const newPost = {
       id: postId,
-      title: body.title,
+      title,
       link: postLink,
       content: html,
       contentMarkdown: body.content,
       summary,
-      tags: body.tags,
+      tags,
       author: body.author,
       pubDate: new Date(),
       channel: channelId,
@@ -180,7 +291,7 @@ export function createRoutes() {
 
     return {
       success: true,
-      message: `Post added to channel "${channelId}"`,
+      message: `Post created successfully in channel "${channelId}"`,
       post: {
         id: newPost.id,
         title: newPost.title,
@@ -196,70 +307,95 @@ export function createRoutes() {
       })
     }),
     body: t.Object({
-      title: t.String({
-        description: '文章标题',
-        examples: ['如何使用 Bun 构建高性能应用']
-      }),
       content: t.String({
         description: '文章内容（Markdown 或 HTML）',
         examples: ['# 标题\n\n这是文章内容...']
       }),
+      title: t.Optional(t.String({
+        description: '文章标题（可选，默认从内容提取第一个 # 标题）',
+        examples: ['自定义标题']
+      })),
       link: t.Optional(t.String({
-        description: '文章链接（可选，不提供则自动生成）',
+        description: '文章链接（可选，默认自动生成内部链接）',
         examples: ['https://example.com/post/123']
       })),
-      contentType: t.Optional(t.Union([t.Literal('markdown'), t.Literal('html')], {
-        description: '内容类型，默认 markdown',
-        examples: ['markdown']
+      contentType: t.Optional(t.Union([
+        t.Literal('auto'),
+        t.Literal('markdown'),
+        t.Literal('html')
+      ], {
+        description: '内容类型（默认为 auto，自动检测）',
+        examples: ['auto']
       })),
       theme: t.Optional(t.String({
-        description: '主题名称（可选）。可选值: github, minimal, dark, modern, elegant, clean, spring',
-        examples: ['github']
+        description: '主题名称（可选，覆盖频道默认主题）',
+        examples: ['github', 'minimal']
       })),
       description: t.Optional(t.String({
-        description: '文章摘要（可选）',
-        examples: ['本文介绍如何使用 Bun 构建高性能应用']
-      })),
-      tags: t.Optional(t.Array(t.String(), {
-        description: '标签列表',
-        examples: [['技术', 'Bun']]
+        description: '文章摘要（可选，默认从内容生成）',
+        examples: ['这是一篇关于 Bun 的教程']
       })),
       author: t.Optional(t.String({
         description: '作者名称',
         examples: ['张三']
+      })),
+      tags: t.Optional(t.Union([
+        t.Array(t.String()),
+        t.String()
+      ], {
+        description: '标签（数组或逗号分隔的字符串）',
+        examples: [['技术', '教程'], '技术,教程']
       }))
     }),
     response: {
       200: t.Object({
         success: t.Boolean({ examples: [true] }),
-        message: t.String({ examples: ['Post added to channel "8cf83b0d-f856-4f7c-bd1c-4f6ca0338ece"'] }),
+        message: t.String({ examples: ['Post created successfully in channel "xxx"'] }),
         post: t.Object({
-          id: t.String({ examples: ['a1b2c3d4-e5f6-7890-abcd-ef1234567890'] }),
-          title: t.String({ examples: ['如何使用 Bun 构建高性能应用'] }),
-          channel: t.String({ examples: ['8cf83b0d-f856-4f7c-bd1c-4f6ca0338ece'] }),
-          pubDate: t.Date({ examples: [new Date().toISOString()] })
+          id: t.String(),
+          title: t.String(),
+          channel: t.String(),
+          pubDate: t.Date()
+        })
+      }),
+      400: t.Object({
+        success: t.Boolean({ examples: [false] }),
+        error: t.String({ examples: ['Missing required field: content'] }),
+        details: t.Object({
+          field: t.String(),
+          issue: t.String(),
+          provided: t.Any(),
+          expected: t.Any(),
+          example: t.Any()
         })
       }),
       401: t.Object({
         success: t.Boolean({ examples: [false] }),
-        error: t.String({ examples: ['Unauthorized'] })
+        error: t.String({ examples: ['Unauthorized'] }),
+        details: t.Object({
+          expected: t.String(),
+          help: t.String()
+        })
       }),
       404: t.Object({
         success: t.Boolean({ examples: [false] }),
-        error: t.String({ examples: ['Channel "xxx" not found'] })
+        error: t.String({ examples: ['Channel "xxx" not found'] }),
+        details: t.Object({
+          channelId: t.String(),
+          help: t.String()
+        })
       })
     },
     detail: {
-      summary: '频道专属 Webhook',
-      description: '向指定频道添加新文章，支持 Markdown 和 HTML 格式。需要在请求头中提供该频道的 token (x-auth-token) 进行鉴权。',
-      tags: ['Webhook']
+      summary: '创建文章（AI 友好）',
+      description: '向指定频道添加新文章。自动提取标题、生成链接和摘要。支持 Markdown 和 HTML 格式。需要在请求头中提供该频道的 token (Authorization: Bearer) 进行鉴权。',
+      tags: ['Posts']
     }
   });
-
   // ============================================================
-  // 频道 RSS Feed
   // ============================================================
-
+  // 文本内容上传接口 - 最简单的推送方式（纯文本）
+  // ============================================================
   app.get('/channels/:id/rss.xml', async ({ params, set }) => {
     const channelId = params.id;
 
@@ -331,7 +467,8 @@ export function createRoutes() {
 
   // 获取所有频道
   app.get('/api/channels', async ({ headers }) => {
-    const authToken = headers['x-auth-token'];
+    const authHeader = headers['authorization'];
+    const authToken = authHeader?.replace('Bearer ', '');
     const isSuperAdmin = authToken === CONFIG.authToken && CONFIG.authToken !== '';
 
     const channels = await readAllChannels();
@@ -375,7 +512,7 @@ export function createRoutes() {
     },
     detail: {
       summary: '获取所有频道',
-      description: '获取所有频道列表。超级管理员（使用 AUTH_TOKEN）可以看到所有频道的 token。',
+      description: '获取所有频道列表。超级管理员（使用 AUTH_TOKEN in Authorization header）可以看到所有频道的 token。',
       tags: ['Channels']
     }
   });
@@ -388,7 +525,8 @@ export function createRoutes() {
       return { error: `Channel "${params.id}" not found` };
     }
 
-    const authToken = headers['x-auth-token'];
+    const authHeader = headers['authorization'];
+    const authToken = authHeader?.replace('Bearer ', '');
     const authResult = await verifyToken(authToken, params.id);
 
     const posts = await readPosts(params.id);
@@ -444,7 +582,8 @@ export function createRoutes() {
   app.post('/api/channels', async ({ body, headers, set }) => {
     // 私有模式：需要超级管理员验证
     if (CONFIG.channelCreationMode === 'private') {
-      const authToken = headers['x-auth-token'];
+      const authHeader = headers['authorization'];
+    const authToken = authHeader?.replace('Bearer ', '');
 
       // 验证是否为超级管理员
       if (!authToken || authToken !== CONFIG.authToken) {
@@ -481,7 +620,7 @@ export function createRoutes() {
         id: newChannel.id,
         name: newChannel.name,
         token: channelToken,
-        webhookUrl: `${CONFIG.feed.url}/api/channels/${newChannel.id}/webhook`,
+        postsUrl: `${CONFIG.feed.url}/api/channels/${newChannel.id}/posts`,
         rssUrl: `${CONFIG.feed.url}/channels/${newChannel.id}/rss.xml`,
       }
     };
@@ -519,12 +658,12 @@ export function createRoutes() {
           }),
           name: t.String({ examples: ['技术资讯'] }),
           token: t.String({
-            description: '频道密钥（用于 Webhook 鉴权，请妥善保存）',
+            description: '频道密钥（用于发布文章和频道管理鉴权，请妥善保存）',
             examples: ['ch_4fd9cdce724ffb8d6ec69187b5438ae2']
           }),
-          webhookUrl: t.String({
-            description: 'Webhook 调用地址（频道专属）',
-            examples: ['https://your-domain.com/api/channels/8cf83b0d-f856-4f7c-bd1c-4f6ca0338ece/webhook']
+          postsUrl: t.String({
+            description: '发布文章的 API 地址（频道专属）',
+            examples: ['https://your-domain.com/api/channels/8cf83b0d-f856-4f7c-bd1c-4f6ca0338ece/posts']
           }),
           rssUrl: t.String({
             description: 'RSS Feed 订阅地址',
@@ -550,7 +689,8 @@ export function createRoutes() {
 
   // 更新频道
   app.put('/api/channels/:id', async ({ params, body, headers, set }) => {
-    const authToken = headers['x-auth-token'];
+    const authHeader = headers['authorization'];
+    const authToken = authHeader?.replace('Bearer ', '');
     const authResult = await verifyToken(authToken, params.id);
 
     if (!authResult.authorized) {
@@ -622,7 +762,8 @@ export function createRoutes() {
 
   // 删除频道
   app.delete('/api/channels/:id', async ({ params, headers, set }) => {
-    const authToken = headers['x-auth-token'];
+    const authHeader = headers['authorization'];
+    const authToken = authHeader?.replace('Bearer ', '');
     const authResult = await verifyToken(authToken, params.id);
 
     if (!authResult.authorized) {
