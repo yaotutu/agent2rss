@@ -112,15 +112,17 @@ export function addInlineStyles(html: string, themeName: string = CONFIG.content
     .replace(/<ol>/g, `<ol style="${cleanStyle(theme.ol || '')}">`)
     .replace(/<li>/g, `<li style="${cleanStyle(theme.li || '')}">`)
 
+    // 链接（先添加样式）
+    .replace(/<a /g, `<a style="${cleanStyle(theme.a || '')}" `)
+
     // 链接（外部链接添加安全属性）
-    .replace(/<a href="([^"]+)"([^>]*)/g, (match, url, rest) => {
-      const style = cleanStyle(theme.a || '');
+    .replace(/<a ([^>]*)href="([^"]+)"([^>]*)>/g, (match, before, url, after) => {
       const isExternal = url.startsWith('http://') || url.startsWith('https://');
 
       if (isExternal) {
-        return `<a href="${url}" style="${style}" rel="noopener noreferrer" target="_blank"${rest}`;
+        return `<a ${before}href="${url}"${after} rel="noopener noreferrer" target="_blank">`;
       } else {
-        return `<a href="${url}" style="${style}"${rest}`;
+        return match;
       }
     })
     .replace(/<hr>/g, `<hr style="${cleanStyle(theme.hr || '')};max-width:100%">`)
