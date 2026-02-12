@@ -89,10 +89,10 @@ export function addInlineStyles(html: string, themeName: string = CONFIG.content
     .replace(/<code>/g, `<code style="${cleanStyle(theme.codeInline || '')}">`)
 
     // 表格
-    .replace(/<table>/g, `<table style="${cleanStyle(theme.table || '')};width:100%;max-width:100%;table-layout:auto">`)
+    .replace(/<table>/g, `<table style="${cleanStyle(theme.table || '')};width:100%;max-width:100%;table-layout:fixed;border-collapse:collapse">`)
     .replace(/<thead>/g, `<thead style="${cleanStyle(theme.thead || '')}">`)
-    .replace(/<th>/g, `<th style="${cleanStyle(theme.th || '')}">`)
-    .replace(/<td>/g, `<td style="${cleanStyle(theme.td || '')}">`)
+    .replace(/<th>/g, `<th style="${cleanStyle(theme.th || '')};word-wrap:break-word;overflow-wrap:break-word">`)
+    .replace(/<td>/g, `<td style="${cleanStyle(theme.td || '')};word-wrap:break-word;overflow-wrap:break-word">`)
     .replace(/<tr>/g, `<tr style="${cleanStyle(theme.tr || '')}">`)
 
     // 引用块
@@ -112,8 +112,17 @@ export function addInlineStyles(html: string, themeName: string = CONFIG.content
     .replace(/<ol>/g, `<ol style="${cleanStyle(theme.ol || '')}">`)
     .replace(/<li>/g, `<li style="${cleanStyle(theme.li || '')}">`)
 
-    // 其他元素
-    .replace(/<a /g, `<a style="${cleanStyle(theme.a || '')}" `)
+    // 链接（外部链接添加安全属性）
+    .replace(/<a href="([^"]+)"([^>]*)/g, (match, url, rest) => {
+      const style = cleanStyle(theme.a || '');
+      const isExternal = url.startsWith('http://') || url.startsWith('https://');
+
+      if (isExternal) {
+        return `<a href="${url}" style="${style}" rel="noopener noreferrer" target="_blank"${rest}`;
+      } else {
+        return `<a href="${url}" style="${style}"${rest}`;
+      }
+    })
     .replace(/<hr>/g, `<hr style="${cleanStyle(theme.hr || '')};max-width:100%">`)
     .replace(/<mark>/g, `<mark style="${cleanStyle(theme.mark || '')}">`)
     .replace(/<ins>/g, `<ins style="${cleanStyle(theme.ins || '')}">`)

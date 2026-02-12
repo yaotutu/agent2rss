@@ -57,7 +57,6 @@ agent2rss/
 
 #### markdown.ts - Markdown 处理服务
 - `markdownToHtml()`: Markdown 转 HTML
-- `markdownToText()`: Markdown 转纯文本
 
 ### 4. **utils** - 工具函数
 - `generateId()`: 生成 UUID

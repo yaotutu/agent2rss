@@ -1,26 +1,39 @@
-# 依赖
+# Dependencies
 node_modules/
 bun.lockb
 
-# 环境变量
+# Environment
 .env
+.env.local
 
-# 数据文件
-data/
+# Data
+data/*.db
+data/*.db-*
 
-# 日志
+# Logs
 *.log
-
-# 系统文件
-.DS_Store
-Thumbs.db
+logs/
 
 # IDE
 .vscode/
 .idea/
 *.swp
 *.swo
+*~
 
-# 构建输出
+# OS
+.DS_Store
+Thumbs.db
+
+# Build
 dist/
 build/
+
+# Tests
+tests/test_*.md
+tests/*.log
+
+# Temporary
+tmp/
+temp/
+*.tmp

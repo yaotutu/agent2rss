@@ -4,9 +4,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 项目概述
 
-Agent2RSS 是一个基于 Bun + ElysiaJS 的高性能 RSS 微服务，支持多频道管理、Markdown/HTML 内容处理和主题系统。
+Agent2RSS 是一个基于 Bun + ElysiaJS 的高性能 RSS 微服务，支持多频道管理、Markdown/HTML 内容处理、文件上传和主题系统。
 
 **技术栈**: Bun runtime, ElysiaJS, SQLite, TypeScript, Zod
+**API 版本**: 2.0.0
 
 ## 常用命令
 
@@ -35,16 +36,23 @@ curl http://localhost:8765/health
 # 查看 API 文档
 open http://localhost:8765/swagger
 
-# 创建频道（公开模式）
+# 创建频道（公开模式，ID 由服务端自动生成）
 curl -X POST http://localhost:8765/api/channels \
   -H "Content-Type: application/json" \
   -d '{"name":"测试频道","description":"测试描述"}'
 
-# 发布文章到频道（使用标准 Bearer Token 认证）
+# 发布文章到频道（JSON 方式）
 curl -X POST http://localhost:8765/api/channels/{channel-id}/posts \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer {channel-token}" \
   -d '{"content":"# 标题\n内容...","title":"测试文章"}'
+
+# 发布文章到频道（文件上传方式）
+curl -X POST http://localhost:8765/api/channels/{channel-id}/posts/upload \
+  -H "Authorization: Bearer {channel-token}" \
+  -F "file=@article.md" \
+  -F "title=测试文章" \
+  -F "tags=技术,教程"
 
 # 获取频道 RSS Feed
 curl http://localhost:8765/channels/{channel-id}/rss.xml
@@ -129,7 +137,6 @@ src/
 - 使用 `markdown-it` 及 10+ 扩展插件
 - 支持: 表格、代码高亮、Emoji、脚注、上下标、标记、缩写等
 - `markdownToHtml()`: Markdown → HTML + 主题样式
-- `markdownToText()`: Markdown → 纯文本（用于摘要生成）
 
 #### 6. 路由层 (routes/index.ts)
 - **Swagger 文档**: 自动生成 API 文档（`@elysiajs/swagger`）
@@ -155,6 +162,7 @@ src/
 | 方法 | 端点 | 鉴权 | 说明 |
 |------|------|------|------|
 | POST | `/api/channels/:channelId/posts` | ✅ | 创建文章（AI 友好，title 可选） |
+| POST | `/api/channels/:channelId/posts/upload` | ✅ | 上传 Markdown 文件创建文章 |
 | GET | `/channels/:id/rss.xml` | ❌ | 获取频道 RSS Feed |
 | GET | `/api/channels` | ❌ | 获取所有频道列表 |
 | GET | `/api/channels/:id` | ❌ | 获取单个频道详情 |
@@ -195,6 +203,33 @@ curl -X POST "http://localhost:8765/api/channels/default/posts" \
   }'
 ```
 
+**文件上传调用**:
+```bash
+curl -X POST "http://localhost:8765/api/channels/default/posts/upload" \
+  -H "Authorization: Bearer ch_xxx..." \
+  -F "file=@article.md" \
+  -F "title=自定义标题" \
+  -F "tags=技术,教程"
+```
+
+### 文件上传说明
+
+新增的 `/api/channels/:channelId/posts/upload` 端点支持直接上传 Markdown 文件：
+
+- **内容类型**: `multipart/form-data`
+- **必需字段**: `file` (Markdown 文件，扩展名为 .md 或 .markdown)
+- **可选字段**: `title`, `link`, `contentType`, `theme`, `description`, `author`, `tags` (逗号分隔字符串)
+- **功能**: 保持与 JSON 接口相同的所有功能（自动提取标题、主题应用、摘要生成等）
+- **认证**: 使用相同的 Bearer Token 机制
+- **文件要求**: UTF-8 编码，非空内容
+- **错误处理**:
+  - 400: 无效文件类型或空内容
+  - 401: 认证失败
+  - 404: 频道不存在
+  - 500: 服务器处理错误
+
+**详细文档**: 参见 `docs/FILE_UPLOAD.md`
+
 ## 开发注意事项
 
 ### 数据库操作
@@ -203,9 +238,20 @@ curl -X POST "http://localhost:8765/api/channels/default/posts" \
 - 修改 schema 后需要手动迁移或删除 `data/agent2rss.db` 重新初始化
 
 ### 频道管理
-- 频道 ID 由服务端自动生成（UUID），不允许客户端指定
+- 频道 ID 由服务端自动生成（UUID），客户端不能指定
 - 频道 Token 在创建时生成，只返回一次，无法找回（类似 API Key）
 - 默认频道 `default` 不能删除（在 `deleteChannel()` 中硬编码保护）
+- 创建频道时的请求体示例：
+  ```json
+  {
+    "name": "技术资讯",
+    "description": "分享最新的技术动态",
+    "theme": "github",
+    "language": "zh-CN",
+    "maxPosts": 100
+  }
+  ```
+- 响应会包含自动生成的频道 ID 和 Token
 
 ### 鉴权逻辑
 - **标准认证方式**: 使用 `Authorization: Bearer <token>` 格式
@@ -234,6 +280,10 @@ curl -X POST "http://localhost:8765/api/channels/default/posts" \
 - 使用 Elysia 的全局错误处理器统一响应格式
 - 验证错误返回 422，未授权返回 401，禁止访问返回 403
 - 数据库错误会被捕获并返回 500
+- **JSON 解析错误** (400): 提供详细的错误诊断和解决方案
+  - 常见原因：JSON 格式错误、Content-Type 不正确、请求体为空
+  - 建议使用文件方式传递 JSON：`curl -d @payload.json`
+  - 或使用文件上传端点：`POST /api/channels/:channelId/posts/upload`
 
 ### 日志记录
 - 使用 pino 日志库（高性能结构化日志）
@@ -243,10 +293,33 @@ curl -X POST "http://localhost:8765/api/channels/default/posts" \
 ## 常见任务
 
 ### 测试文章发布功能
+
+**方式一：JSON 接口**
 1. 创建测试频道或使用现有频道 ID
 2. 获取频道 Token（创建时返回，或使用超级管理员 Token 查询）
 3. 使用 `Authorization: Bearer` 头发送 POST 请求到 `/api/channels/:channelId/posts`
 4. 验证 RSS Feed 是否包含新文章：访问 `/channels/:channelId/rss.xml`
+
+**方式二：文件上传接口**
+1. 准备 Markdown 文件（.md 或 .markdown）
+2. 使用 `multipart/form-data` 上传到 `/api/channels/:channelId/posts/upload`
+3. 可选添加 `title`、`tags` 等表单字段
+4. 验证 RSS Feed 是否包含新文章
+
+**示例**：
+```bash
+# JSON 方式
+curl -X POST "http://localhost:8765/api/channels/default/posts" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer ch_xxx..." \
+  -d '{"content": "# 标题\n\n内容"}'
+
+# 文件上传方式
+curl -X POST "http://localhost:8765/api/channels/default/posts/upload" \
+  -H "Authorization: Bearer ch_xxx..." \
+  -F "file=@article.md" \
+  -F "tags=技术,教程"
+```
 
 ### 添加新的 API 端点
 1. 在 `src/routes/index.ts` 中添加路由
@@ -295,10 +368,10 @@ sudo systemctl start agent2rss
 
 ## 文档资源
 
-- **API 文档**: `http://localhost:8765/swagger`（服务运行时访问）
-- **架构说明**: `docs/ARCHITECTURE.md` - 模块化架构详解
+- **文档资源**: `docs/ARCHITECTURE.md` - 模块化架构详解
 - **多频道指南**: `docs/MULTI_CHANNEL.md` - 多频道使用完整指南
 - **API 参考**: `docs/API.md` - API 接口详细说明
+- **文件上传**: `docs/FILE_UPLOAD.md` - Markdown 文件上传功能说明
 - **项目结构**: `docs/PROJECT_STRUCTURE.md` - 目录结构和模块关系
 - **AI 快速开始**: `docs/AI_QUICK_START.md` - AI Agent 集成指南
 - **故障排除**: `docs/TROUBLESHOOTING.md` - 常见问题解决方案
