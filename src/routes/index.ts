@@ -285,20 +285,24 @@ export function createRoutes() {
       author: body.author,
       pubDate: new Date(),
       channel: channelId,
+      idempotencyKey: body.idempotencyKey,
     };
 
-    // 保存到指定频道
-    await addPost(newPost, channelId);
+    // 保存到指定频道（支持幂等性）
+    const result = await addPost(newPost, channelId);
 
     return {
       success: true,
-      message: `Post created successfully in channel "${channelId}"`,
+      message: result.isNew
+        ? `Post created successfully in channel "${channelId}"`
+        : `Post already exists (idempotency key matched)`,
       post: {
-        id: newPost.id,
+        id: result.id,
         title: newPost.title,
         channel: channelId,
         pubDate: newPost.pubDate
-      }
+      },
+      isNew: result.isNew
     };
   }, {
     params: t.Object({
@@ -346,6 +350,11 @@ export function createRoutes() {
       ], {
         description: '标签（数组或逗号分隔的字符串）',
         examples: [['技术', '教程'], '技术,教程']
+      })),
+      idempotencyKey: t.Optional(t.String({
+        description: '幂等性键，防止重复发布。相同频道内相同 key 的请求只会创建一次文章',
+        maxLength: 255,
+        examples: ['article-2024-01-01-001']
       }))
     }),
     response: {
@@ -357,6 +366,10 @@ export function createRoutes() {
           title: t.String(),
           channel: t.String(),
           pubDate: t.Date()
+        }),
+        isNew: t.Boolean({
+          description: '是否为新创建的文章。false 表示已存在（幂等性键匹配）',
+          examples: [true]
         })
       }),
       400: t.Object({
@@ -444,7 +457,7 @@ export function createRoutes() {
 
     try {
       // Access the file and other fields from the body as defined in the schema
-      const { file, title, link, contentType, theme, description, author, tags } = body;
+      const { file, title, link, contentType, theme, description, author, tags, idempotencyKey } = body;
 
       // Check if file exists and is a proper file
       if (!file || typeof file === 'string' || !(file instanceof File)) {
@@ -549,20 +562,24 @@ export function createRoutes() {
         author,
         pubDate: new Date(),
         channel: channelId,
+        idempotencyKey,
       };
 
-      // 保存到指定频道
-      await addPost(newPost, channelId);
+      // 保存到指定频道（支持幂等性）
+      const result = await addPost(newPost, channelId);
 
       return {
         success: true,
-        message: `Post created successfully in channel "${channelId}" from uploaded file "${fileName}"`,
+        message: result.isNew
+          ? `Post created successfully in channel "${channelId}" from uploaded file "${fileName}"`
+          : `Post already exists (idempotency key matched)`,
         post: {
-          id: newPost.id,
+          id: result.id,
           title: newPost.title,
           channel: channelId,
           pubDate: newPost.pubDate
-        }
+        },
+        isNew: result.isNew
       };
     } catch (error) {
       console.error('File upload error:', error);
@@ -608,7 +625,8 @@ export function createRoutes() {
       theme: t.Optional(t.String()),
       description: t.Optional(t.String()),
       author: t.Optional(t.String()),
-      tags: t.Optional(t.String())
+      tags: t.Optional(t.String()),
+      idempotencyKey: t.Optional(t.String())
     }),
     type: 'multipart/form-data',
     response: {
@@ -620,6 +638,10 @@ export function createRoutes() {
           title: t.String(),
           channel: t.String(),
           pubDate: t.Date()
+        }),
+        isNew: t.Boolean({
+          description: '是否为新创建的文章。false 表示已存在（幂等性键匹配）',
+          examples: [true]
         })
       }),
       400: t.Object({

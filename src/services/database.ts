@@ -80,6 +80,32 @@ function initializeSchema() {
   db.run('CREATE INDEX IF NOT EXISTS idx_posts_channel ON posts(channel_id)');
   db.run('CREATE INDEX IF NOT EXISTS idx_posts_pub_date ON posts(pub_date DESC)');
   db.run('CREATE INDEX IF NOT EXISTS idx_post_tags_tag ON post_tags(tag)');
+
+  // 迁移幂等性键字段
+  migrateIdempotencyKey();
+}
+
+/**
+ * 迁移幂等性键字段（向后兼容）
+ */
+function migrateIdempotencyKey() {
+  if (!db) return;
+
+  // 检查 idempotency_key 列是否已存在
+  const columns = db.query(`PRAGMA table_info(posts)`).all() as any[];
+  const hasKey = columns.some(col => col.name === 'idempotency_key');
+
+  if (!hasKey) {
+    // 添加幂等性键列
+    db.run(`ALTER TABLE posts ADD COLUMN idempotency_key TEXT`);
+
+    // 创建部分唯一索引（只对非 NULL 值生效）
+    db.run(`
+      CREATE UNIQUE INDEX idx_posts_idempotency
+      ON posts(channel_id, idempotency_key)
+      WHERE idempotency_key IS NOT NULL
+    `);
+  }
 }
 
 /**

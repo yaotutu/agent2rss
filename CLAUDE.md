@@ -27,6 +27,7 @@ bun install
 - 数据库文件位置: `data/agent2rss.db`
 - 使用 Bun 内置的 SQLite 驱动
 - 数据库在首次启动时自动初始化
+- 支持自动迁移（如幂等性键字段）
 
 ### 测试 API
 ```bash
@@ -46,6 +47,12 @@ curl -X POST http://localhost:8765/api/channels/{channel-id}/posts \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer {channel-token}" \
   -d '{"content":"# 标题\n内容...","title":"测试文章"}'
+
+# 发布文章（带幂等性键，防止重复）
+curl -X POST http://localhost:8765/api/channels/{channel-id}/posts \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer {channel-token}" \
+  -d '{"content":"# 标题\n内容...","idempotencyKey":"unique-key-123"}'
 
 # 发布文章到频道（文件上传方式）
 curl -X POST http://localhost:8765/api/channels/{channel-id}/posts/upload \
@@ -67,10 +74,11 @@ curl http://localhost:8765/channels/{channel-id}/rss.xml
 POST /api/channels/:channelId/posts
   → 鉴权验证 (Authorization: Bearer token, services/auth.ts)
   → 频道验证 (检查频道是否存在)
+  → 幂等性检查 (如果提供 idempotencyKey，检查是否已存在)
   → 内容处理 (services/markdown.ts)
   → 主题应用 (services/theme.ts)
   → 数据存储 (services/storage.ts → SQLite)
-  → 返回响应
+  → 返回响应 (包含 isNew 标志)
 ```
 
 **RSS Feed 生成流程**:
@@ -111,16 +119,18 @@ src/
 - **单例模式**: `getDatabase()` 返回全局唯一的 SQLite 实例
 - **表结构**:
   - `channels`: 频道配置（id, name, description, theme, token 等）
-  - `posts`: 文章数据（id, title, content, channel_id 等）
+  - `posts`: 文章数据（id, title, content, channel_id, idempotency_key 等）
   - `post_tags`: 文章标签（多对多关系）
 - **外键约束**: 启用 `PRAGMA foreign_keys = ON`，删除频道时级联删除文章
 - **索引优化**: channel_id, pub_date, tag 字段建立索引
+- **幂等性支持**: `(channel_id, idempotency_key)` 部分唯一索引，防止重复发布
 
 #### 2. 存储层 (services/storage.ts)
 - 封装所有数据库操作
 - 频道管理: `createChannel()`, `readChannel()`, `updateChannel()`, `deleteChannel()`
-- 文章管理: `addPost()`, `readPosts()` (支持按频道过滤)
+- 文章管理: `addPost()` 返回 `{id: string, isNew: boolean}`, `readPosts()` (支持按频道过滤)
 - 自动维护 `maxPosts` 限制（滚动删除旧文章）
+- **幂等性检查**: 在插入前检查 `idempotencyKey` 是否已存在
 
 #### 3. 鉴权系统 (services/auth.ts)
 - **双层鉴权**:
@@ -199,7 +209,8 @@ curl -X POST "http://localhost:8765/api/channels/default/posts" \
     "link": "https://example.com/article",
     "contentType": "markdown",
     "author": "作者名",
-    "tags": ["技术", "教程"]
+    "tags": ["技术", "教程"],
+    "idempotencyKey": "article-2024-01-01-001"
   }'
 ```
 
@@ -209,7 +220,8 @@ curl -X POST "http://localhost:8765/api/channels/default/posts/upload" \
   -H "Authorization: Bearer ch_xxx..." \
   -F "file=@article.md" \
   -F "title=自定义标题" \
-  -F "tags=技术,教程"
+  -F "tags=技术,教程" \
+  -F "idempotencyKey=article-2024-01-01-001"
 ```
 
 ### 文件上传说明
@@ -218,8 +230,8 @@ curl -X POST "http://localhost:8765/api/channels/default/posts/upload" \
 
 - **内容类型**: `multipart/form-data`
 - **必需字段**: `file` (Markdown 文件，扩展名为 .md 或 .markdown)
-- **可选字段**: `title`, `link`, `contentType`, `theme`, `description`, `author`, `tags` (逗号分隔字符串)
-- **功能**: 保持与 JSON 接口相同的所有功能（自动提取标题、主题应用、摘要生成等）
+- **可选字段**: `title`, `link`, `contentType`, `theme`, `description`, `author`, `tags` (逗号分隔字符串), `idempotencyKey` (幂等性键)
+- **功能**: 保持与 JSON 接口相同的所有功能（自动提取标题、主题应用、摘要生成、幂等性支持等）
 - **认证**: 使用相同的 Bearer Token 机制
 - **文件要求**: UTF-8 编码，非空内容
 - **错误处理**:
@@ -229,6 +241,34 @@ curl -X POST "http://localhost:8765/api/channels/default/posts/upload" \
   - 500: 服务器处理错误
 
 **详细文档**: 参见 `docs/FILE_UPLOAD.md`
+
+### 幂等性支持
+
+为防止 AI Agent 重试导致的重复文章，系统支持幂等性键：
+
+- **使用方式**: 在请求中添加 `idempotencyKey` 字段（可选，最大 255 字符）
+- **工作原理**: 相同频道内相同 `idempotencyKey` 的请求只会创建一次文章
+- **响应标识**: 返回 `isNew` 字段，`true` 表示新创建，`false` 表示已存在
+- **数据库保证**: 使用 `(channel_id, idempotency_key)` 唯一索引防止并发重复
+- **向后兼容**: 不提供 `idempotencyKey` 的请求照常工作
+- **适用接口**: JSON 接口和文件上传接口都支持
+
+**示例**:
+```bash
+# 第一次请求 - 创建新文章
+curl -X POST "http://localhost:8765/api/channels/default/posts" \
+  -H "Authorization: Bearer ch_xxx..." \
+  -H "Content-Type: application/json" \
+  -d '{"content":"# 测试","idempotencyKey":"key1"}'
+# 响应: {"success":true,"isNew":true,...}
+
+# 第二次请求 - 返回已存在的文章
+curl -X POST "http://localhost:8765/api/channels/default/posts" \
+  -H "Authorization: Bearer ch_xxx..." \
+  -H "Content-Type: application/json" \
+  -d '{"content":"# 测试","idempotencyKey":"key1"}'
+# 响应: {"success":true,"isNew":false,...}
+```
 
 ## 开发注意事项
 
@@ -269,12 +309,13 @@ curl -X POST "http://localhost:8765/api/channels/default/posts/upload" \
 
 ### 内容处理
 - **必填字段**: `content`（文章内容，支持 Markdown 和 HTML）
-- **可选字段**: `title`（标题，未提供则自动从 Markdown 第一个 # 标题提取）
+- **可选字段**: `title`（标题，未提供则自动从 Markdown 第一个 # 标题提取）、`idempotencyKey`（幂等性键，防止重复发布）
 - 支持 Markdown 和 HTML 两种输入格式，可指定 `contentType` 或自动检测
 - Markdown 会自动应用主题样式
 - HTML 内容直接存储，不做额外处理
 - 摘要自动从 HTML 提取前 N 个字符（去除标签）
 - 链接未提供时自动生成内部永久链接：`{FEED_URL}/channels/{channelId}/posts/{postId}`
+- **幂等性**: 提供 `idempotencyKey` 时，相同频道内相同键的请求只会创建一次文章
 
 ### 错误处理
 - 使用 Elysia 的全局错误处理器统一响应格式

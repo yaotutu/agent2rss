@@ -65,6 +65,7 @@ export interface Post {
   tags?: string[];
   author?: string;
   pubDate: Date;
+  idempotencyKey?: string;       // 幂等性键，防止重复发布
 }
 
 // Webhook 请求类型（保留用于向后兼容）
@@ -90,6 +91,7 @@ export interface CreatePostRequest {
   description?: string;                               // 可选，默认自动生成摘要
   tags?: string | string[];                           // 统一支持两种类型
   author?: string;                                    // 可选
+  idempotencyKey?: string;                            // 幂等性键，防止重复发布
 }
 
 // 错误详情
@@ -125,6 +127,7 @@ export interface ApiResponse {
     channel?: string;
     pubDate: Date;
   };
+  isNew?: boolean;                                    // 是否为新创建的文章（幂等性支持）
   error?: string;
   details?: ErrorDetails;
 }

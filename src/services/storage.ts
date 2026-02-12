@@ -73,8 +73,9 @@ function getPostTags(postId: string): string[] {
 
 /**
  * 添加文章（必须指定频道）
+ * 返回 { id: string, isNew: boolean }，支持幂等性
  */
-export async function addPost(post: Post, channel: string): Promise<void> {
+export async function addPost(post: Post, channel: string): Promise<{ id: string; isNew: boolean }> {
   const db = getDatabase();
 
   // 检查频道是否存在
@@ -85,14 +86,28 @@ export async function addPost(post: Post, channel: string): Promise<void> {
     throw new Error(`Channel "${channel}" not found`);
   }
 
+  // 幂等性检查：如果提供了 idempotencyKey，检查是否已存在
+  if (post.idempotencyKey) {
+    const existingQuery = db.query(`
+      SELECT id FROM posts
+      WHERE channel_id = ? AND idempotency_key = ?
+    `);
+    const existing = existingQuery.get(channel, post.idempotencyKey) as any;
+
+    if (existing) {
+      // 已存在相同 idempotencyKey 的文章，返回现有文章 ID
+      return { id: existing.id, isNew: false };
+    }
+  }
+
   // 开始事务
   db.run('BEGIN TRANSACTION');
 
   try {
-    // 插入文章
+    // 插入文章（包含 idempotency_key）
     const insertPost = db.query(`
-      INSERT INTO posts (id, title, link, content, content_markdown, summary, author, pub_date, channel_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO posts (id, title, link, content, content_markdown, summary, author, pub_date, channel_id, idempotency_key)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     insertPost.run(
@@ -104,7 +119,8 @@ export async function addPost(post: Post, channel: string): Promise<void> {
       post.summary,
       post.author || null,
       post.pubDate.toISOString(),
-      channel
+      channel,
+      post.idempotencyKey || null
     );
 
     // 插入标签
@@ -139,6 +155,9 @@ export async function addPost(post: Post, channel: string): Promise<void> {
     }
 
     db.run('COMMIT');
+
+    // 返回新创建的文章 ID
+    return { id: post.id, isNew: true };
   } catch (error) {
     db.run('ROLLBACK');
     throw error;

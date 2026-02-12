@@ -1,422 +1,196 @@
 ---
 name: agent2rss-client
-description: Agent2RSS 服务客户端，帮助用户管理 RSS 频道和推送内容。触发场景：(1) 用户提到"Agent2RSS"、"RSS 频道"、"推送文章/内容"等关键词，(2) 用户想要创建或管理 RSS 订阅，(3) 用户需要发布内容到 RSS Feed。
+description: Agent2RSS 服务客户端，帮助用户管理 RSS 频道和推送内容。触发场景：(1) 用户提到"Agent2RSS"、"RSS 频道"、"推送文章/内容"等关键词，(2) 用户想要创建或管理 RSS 订阅，(3) 用户需要发布内容到 RSS Feed，(4) 用户需要使用幂等性防止重复发布。支持 JSON 和文件上传两种方式推送内容。
 ---
 
-# Agent2RSS Client 技能
+# Agent2RSS Client Skill
 
-这是一个轻量级技能，帮助 Claude 使用 Agent2RSS 服务管理 RSS 频道和推送内容。
+帮助用户通过 Agent2RSS 服务创建和管理 RSS 频道，推送内容到 RSS Feed。
 
-## ⚡ 快速参考
+## 核心功能
 
-### 认证方式（重要！）
-Agent2RSS API 使用 **标准 Bearer Token** 认证：
-- ✅ 正确：`-H "Authorization: Bearer ch_xxx..."`
-- ❌ 错误：`-H "x-auth-token: ch_xxx..."`
+1. **频道管理** - 创建、查询、更新、删除 RSS 频道
+2. **内容推送** - 通过 JSON 或文件上传方式发布文章
+3. **幂等性支持** - 使用 idempotencyKey 防止重复发布
+4. **RSS 订阅** - 生成标准 RSS Feed 供阅读器订阅
 
-### 快速推送内容
+## 配置管理
+
+技能使用 `config.json` 存储服务器地址和频道信息：
+
+```json
+{
+  "serverUrl": "http://localhost:8765",
+  "currentChannelId": "default",
+  "channels": [
+    {
+      "id": "default",
+      "name": "默认频道",
+      "token": "ch_xxx...",
+      "postsUrl": "http://localhost:8765/api/channels/default/posts",
+      "rssUrl": "http://localhost:8765/channels/default/rss.xml"
+    }
+  ]
+}
+```
+
+### 配置初始化
+
+首次使用时，如果 `config.json` 不存在，从 `assets/config-template.json` 复制并提示用户配置服务器地址。
+
+## 认证方式
+
+**标准 Bearer Token 认证**（必需）：
+
 ```bash
-curl -X POST "{postsUrl}" \
+Authorization: Bearer <token>
+```
+
+- **频道 Token**：格式 `ch_xxx...`，用于频道级操作
+- **超级管理员 Token**：环境变量 `AUTH_TOKEN`，用于全局管理
+
+## 常用操作
+
+### 1. 创建频道
+
+```bash
+curl -X POST {serverUrl}/api/channels \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer {token}" \
   -d '{
-    "content": "文章内容（支持 Markdown）",
-    "title": "文章标题（可选）"
+    "name": "技术博客",
+    "description": "分享技术文章"
   }'
 ```
 
-### 常见错误
-| 错误信息 | 原因 | 解决方案 |
-|---------|------|---------|
-| `Unauthorized` | 使用了错误的认证头 | 使用 `Authorization: Bearer` 而不是 `x-auth-token` |
-| `Channel not found` | 频道 ID 不存在 | 检查 config.json 中的 currentChannelId |
-| `Missing required fields` | 缺少必填字段 | 确保包含 content 字段（title 可选） |
+响应包含频道 ID 和 Token，保存到 `config.json`。
 
-## 📁 配置文件
+### 2. 推送内容（JSON 方式）
 
-### 配置文件位置
-**重要**：配置文件 `config.json` 位于当前 skill 目录下：
-- 个人 skill：`~/.claude/skills/agent2rss-client/config.json`
-- 项目 skill：`.claude/skills/agent2rss-client/config.json`
+**最简调用**（仅内容，标题自动提取）：
 
-根据你使用的 skill 位置，配置文件会自动保存在对应的 skill 目录中。
-
-### 配置文件结构
-```json
-{
-  "serverUrl": "http://agent2rss.yaotutu.top:8765",
-  "currentChannelId": null,
-  "channels": []
-}
-```
-
-### 频道数据结构
-```json
-{
-  "id": "8cf83b0d-f856-4f7c-bd1c-4f6ca0338ece",
-  "name": "技术博客",
-  "description": "分享技术文章",
-  "token": "ch_4fd9cdce724ffb8d6ec69187b5438ae2",
-  "postsUrl": "http://agent2rss.yaotutu.top:8765/api/channels/8cf83b0d.../posts",
-  "rssUrl": "http://agent2rss.yaotutu.top:8765/channels/8cf83b0d.../rss.xml",
-  "createdAt": "2026-02-05T10:30:00Z"
-}
-```
-
-## 🚀 核心操作
-
-### 1. 推送内容（最常用）
-1. 检查 `currentChannelId` 是否存在，如不存在则提示创建频道
-2. 询问内容信息：`content`（必填，支持 Markdown）、`title`（可选，自动提取）、`description`（可选）、`author`（可选）、`tags`（可选）
-3. 调用 `POST {postsUrl}` 并附加 `Authorization: Bearer {token}` 头
-4. 显示推送成功消息和 RSS URL
-
-### 2. 快速推送（简化流程）
-当用户直接提供内容时（例如："推送这篇文章到 RSS"）：
-1. 从用户消息中提取 title 和 content
-2. 使用默认值填充可选字段
-3. 直接调用 Webhook API
-
-### 3. 首次使用初始化
-1. 检查 `config.json` 是否存在（在当前 skill 目录下）
-2. 如果不存在：
-   - 询问服务器地址（默认：http://agent2rss.yaotutu.top:8765）
-   - 询问频道名称（默认："我的频道"）
-   - 询问频道描述（默认："Claude 创建的 RSS 频道"）
-3. 调用 `POST /api/channels` 创建频道
-4. 保存配置到 `config.json`：
-   - `serverUrl`
-   - `currentChannelId`
-   - `channels` 数组
-5. 显示 RSS URL 供用户订阅
-
-**询问内容**：
-- **服务器地址**：提供默认服务器（http://agent2rss.yaotutu.top:8765）、本地服务器（http://localhost:8765）选项，用户可选择 "Other" 输入自定义地址
-- **频道名称**：提供默认值 "我的频道"，用户可选择 "Other" 输入自定义名称
-- **频道描述**：提供默认值 "Claude 创建的 RSS 频道"，用户可选择 "Other" 输入自定义描述
-
-**注意**：初始化完成后，用户即可直接使用该频道推送内容，无需额外配置
-
-### 4. 创建频道
-1. 询问频道名称和描述（使用 AskUserQuestion）
-2. 调用 `POST {serverUrl}/api/channels`
-3. 将返回的频道信息添加到 `config.json` 的 `channels` 数组
-4. 设置 `currentChannelId` 为新频道 ID
-5. 显示 RSS URL
-
-### 5. 管理频道
-
-#### 列出所有频道
-读取 `config.json`，显示频道名称、描述、创建时间，标记当前频道（✓）
-
-#### 切换当前频道
-1. 列出所有频道
-2. 询问用户选择频道
-3. 更新 `currentChannelId` 并保存
-
-#### 查看频道详情
-显示当前频道的 RSS URL、Webhook URL、Token、创建时间
-
-#### 删除频道
-1. 询问用户确认
-2. 从 `channels` 数组中移除
-3. 如果删除的是当前频道，清空 `currentChannelId`
-
-## ❌ 错误处理
-
-### JSON 解析错误（400 Bad Request）
-
-**问题**：curl 命令返回 400 错误，提示 JSON 解析失败
-
-**错误信息示例**：
-```json
-{
-  "success": false,
-  "error": "请求体解析失败",
-  "details": {
-    "type": "JSON_PARSE_ERROR",
-    "message": "无法解析请求体中的 JSON 数据"
-  }
-}
-```
-
-**原因**：在命令行直接使用多行 JSON 时，shell 对特殊字符的处理导致格式错误
-
-**解决方案**：
-
-✅ **方案 1：使用文件方式（推荐）**
 ```bash
-# 创建 JSON 文件
-cat > payload.json << 'EOF'
-{
-  "title": "文章标题",
-  "content": "# Markdown 内容",
-  "contentType": "markdown"
-}
-EOF
-
-# 使用 @ 符号引用文件
-push-article payload.json
-```
-
-✅ **方案 2：使用 CLI 工具**
-```bash
-# 进入 Agent2RSS 项目目录
-cd /path/to/agent2rss
-
-# 推送 Markdown 文件
-bun run cli push -f article.md
-```
-
-✅ **方案 3：使用 heredoc（注意引号）**
-```bash
-curl -X POST "{webhookUrl}" \
+curl -X POST {postsUrl} \
   -H "Content-Type: application/json" \
-  -H "x-auth-token: {token}" \
-  -d @- << 'EOF'
-{
-  "title": "文章标题",
-  "content": "内容"
-}
-EOF
+  -H "Authorization: Bearer {token}" \
+  -d '{
+    "content": "# 标题\n\n内容..."
+  }'
 ```
 
-**关键点**：使用 `<< 'EOF'`（单引号）而不是 `<< EOF`，避免变量替换
-
----
-
-### 鉴权失败（401 Unauthorized）
-
-**问题**：返回 401 Unauthorized
-
-**解决方案**：
-1. 检查 `.agent2rss-client.json` 中的 token 是否正确
-2. 使用 `list-channels` 命令查看所有频道
-3. Token 只在创建时返回，请妥善保存
-4. 如果丢失了 token，使用超级管理员 token 查询
-
----
-
-### 频道不存在（404 Not Found）
-
-**问题**：返回 404 Not Found
-
-**解决方案**：
-1. 使用 `list-channels` 查看所有可用频道
-2. 检查频道 ID 是否正确
-3. 使用 `set-active-channel` 切换频道
-4. 如果频道被删除，创建新频道
-
----
-
-### 配置文件不存在
-提示首次使用需要初始化配置，引导用户选择服务器地址
-
-### 当前频道未设置
-提示需要先创建或选择频道，提供创建新频道或从现有频道中选择的选项
-
-### API 调用失败
-显示错误信息（HTTP 状态码和响应内容），建议检查服务器地址、网络连接、Token 有效性
-
-### 配置文件损坏
-提示配置文件格式错误，建议备份当前配置后重新初始化
-
-## 🔒 安全注意事项
-
-1. **Token 保护**：配置文件包含敏感的 Token，不要在日志或输出中显示完整 Token
-2. **HTTPS 优先**：建议用户使用 HTTPS 服务器地址
-3. **输入验证**：在调用 API 前验证用户输入（非空、格式正确）
-4. **错误信息**：不要在错误信息中泄露敏感信息
-
-## 默认值
-
-- 频道名称：`"我的频道"`
-- 频道描述：`"Claude 创建的 RSS 频道"`
-- 服务器地址：`"http://agent2rss.yaotutu.top:8765"`
-- 作者：`"Claude"`
-
-## 参考文档
-
-详细的 API 调用示例请参考：`references/api-examples.md`
-
----
-
-## 🛠️ CLI 工具使用指南
-
-Agent2RSS 提供了独立的 CLI 工具，可以更简单地推送内容，避免 JSON 解析问题。
-
-### 安装和配置
+**完整参数**：
 
 ```bash
-# 1. 进入 Agent2RSS 项目目录
-cd /path/to/agent2rss
-
-# 2. 安装依赖
-bun install
-
-# 3. 初始化配置
-bun run cli init
+curl -X POST {postsUrl} \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer {token}" \
+  -d '{
+    "content": "# 标题\n\n内容...",
+    "title": "自定义标题",
+    "link": "https://example.com/article",
+    "contentType": "markdown",
+    "author": "作者名",
+    "tags": ["技术", "教程"],
+    "idempotencyKey": "article-2024-01-01-001"
+  }'
 ```
 
-按照提示输入：
-- API 地址（默认：http://localhost:8765）
-- 默认频道 ID
-- 频道 Token（可选）
-
-### 推送内容
-
-#### 推送 Markdown 文件
-
-```bash
-bun run cli push -f article.md
-```
-
-工具会自动提取第一个 # 标题作为文章标题。
-
-#### 推送 JSON 文件
-
-```bash
-bun run cli push -f payload.json
-```
-
-JSON 格式示例：
-```json
-{
-  "title": "文章标题",
-  "content": "# Markdown 内容",
-  "contentType": "markdown",
-  "author": "作者",
-  "tags": ["标签1", "标签2"]
-}
-```
-
-#### 指定频道和 Token
-
-```bash
-bun run cli push -c <channel-id> -t <token> -f article.md
-```
-
-#### 批量推送
-
-```bash
-# 推送目录下所有 .md 文件
-for file in articles/*.md; do
-  echo "正在推送: $file"
-  bun run cli push -f "$file"
-  echo "---"
-done
-```
-
-#### 从标准输入推送
-
-```bash
-# 管道输入
-echo "# 测试文章\n\n内容" | bun run cli push
-
-# 或使用 heredoc
-bun run cli push << 'EOF'
-# 测试文章
-
-这是文章内容。
-EOF
-```
-
-### CLI 工具优势
-
-- ✅ 自动处理 JSON 序列化，避免特殊字符问题
-- ✅ 支持从文件读取内容（.md 和 .json）
-- ✅ 友好的错误提示和解决方案
-- ✅ 配置管理，避免重复输入 token
-- ✅ 支持批量操作
-- ✅ 自动提取 Markdown 标题
-- ✅ 完全避免 shell 对特殊字符的处理问题
-
-### 配置文件说明
-
-CLI 工具会在当前目录创建 `.agent2rss.json` 配置文件：
+**响应示例**：
 
 ```json
 {
-  "apiUrl": "http://localhost:8765",
-  "defaultChannel": "8cf83b0d-f856-4f7c-bd1c-4f6ca0338ece",
-  "tokens": {
-    "8cf83b0d-f856-4f7c-bd1c-4f6ca0338ece": "ch_4fd9cdce724ffb8d6ec69187b5438ae2"
-  }
+  "success": true,
+  "message": "Post created successfully in channel \"xxx\"",
+  "post": {
+    "id": "xxx",
+    "title": "标题",
+    "channel": "default",
+    "pubDate": "2024-01-01T00:00:00.000Z"
+  },
+  "isNew": true
 }
 ```
 
-**注意**：
-- 每个工作目录可以有独立的配置文件
-- 配置文件应添加到 `.gitignore`，避免泄露 token
-- 可以在不同目录创建不同的配置，管理多个服务器
+### 3. 推送内容（文件上传方式）
 
-### CLI 与 Skill 配合使用
+```bash
+curl -X POST {serverUrl}/api/channels/{channelId}/posts/upload \
+  -H "Authorization: Bearer {token}" \
+  -F "file=@article.md" \
+  -F "title=自定义标题" \
+  -F "tags=技术,教程" \
+  -F "idempotencyKey=article-2024-01-01-001"
+```
 
-**推荐工作流**：
+### 4. 幂等性支持
 
-1. **初始化阶段**（使用 Skill）
-   - 使用 `agent2rss-client` skill 创建频道
-   - 保存频道信息和 token
+使用 `idempotencyKey` 防止重复发布：
 
-2. **日常使用**（使用 CLI）
-   - 使用 CLI 工具推送内容
-   - 避免频繁调用 API 鉴权
-
-3. **管理频道**（使用 Skill）
-   - 使用 skill 列出、切换、删除频道
-   - 查看频道详情
+- 相同频道内相同 key 的请求只会创建一次文章
+- 响应中 `isNew: true` 表示新创建，`false` 表示已存在
+- 适用于 JSON 和文件上传两种方式
 
 **示例**：
 
 ```bash
-# 1. 使用 Skill 创建频道
-# (在 Claude Code 中)
-# "创建一个名为'技术博客'的频道"
+# 第一次请求 - 创建新文章
+curl -X POST {postsUrl} \
+  -H "Authorization: Bearer {token}" \
+  -H "Content-Type: application/json" \
+  -d '{"content":"# 测试","idempotencyKey":"key1"}'
+# 响应: {"success":true,"isNew":true,...}
 
-# 2. 保存频道 ID 和 token
-# 频道 ID: abc-123
-# Token: ch_xxx
-
-# 3. 初始化 CLI 配置
-bun run cli init
-# 输入频道 ID 和 token
-
-# 4. 推送内容
-bun run cli push -f article.md
-
-# 5. 批量推送
-for file in posts/*.md; do
-  bun run cli push -f "$file"
-done
+# 第二次请求 - 返回已存在的文章
+curl -X POST {postsUrl} \
+  -H "Authorization: Bearer {token}" \
+  -H "Content-Type: application/json" \
+  -d '{"content":"# 测试","idempotencyKey":"key1"}'
+# 响应: {"success":true,"isNew":false,...}
 ```
 
-### 故障排除
+## 工作流程
 
-如果 CLI 工具遇到问题：
+### 推送单篇文章
 
-1. **检查配置文件**
-   ```bash
-   cat .agent2rss.json
-   ```
+1. 从 `config.json` 读取当前频道配置
+2. 准备文章内容（Markdown 或 HTML）
+3. 选择推送方式：
+   - **JSON 方式**：适合程序化调用，内容在请求体中
+   - **文件上传方式**：适合已有 Markdown 文件的场景
+4. 可选添加 `idempotencyKey` 防止重复
+5. 发送请求并检查响应中的 `isNew` 字段
+6. 提供 RSS Feed URL 供用户订阅
 
-2. **测试服务器连接**
-   ```bash
-   curl http://localhost:8765/health
-   ```
+### 批量推送文章
 
-3. **查看详细错误**
-   CLI 工具会显示友好的错误提示和解决方案
+1. 遍历文章列表
+2. 为每篇文章生成唯一的 `idempotencyKey`（如：`article-{timestamp}-{index}`）
+3. 使用 JSON 或文件上传方式推送
+4. 检查 `isNew` 字段，跳过已存在的文章
+5. 推送间隔建议至少 1 秒
 
-4. **使用命令行参数**
-   如果配置文件有问题，可以直接指定参数：
-   ```bash
-   bun run cli push -c <channel-id> -t <token> -f article.md
-   ```
+### 创建新频道
 
----
+1. 提示用户提供频道名称和描述
+2. 调用创建频道 API
+3. 保存返回的频道 ID 和 Token 到 `config.json`
+4. 更新 `currentChannelId` 为新频道
+5. 提供 RSS Feed URL
 
-## 📚 更多资源
+## 错误处理
 
-- [故障排除指南](../../docs/TROUBLESHOOTING.md) - 完整的错误解决方案
-- [API 文档](http://localhost:8765/swagger) - Swagger UI（服务运行时）
-- [项目文档](../../CLAUDE.md) - 架构和开发指南
+- **401 Unauthorized**：Token 无效或缺失，检查 `Authorization` 头
+- **404 Not Found**：频道不存在，检查频道 ID
+- **400 Bad Request**：参数错误，检查必填字段 `content`
+- **500 Server Error**：服务器错误，稍后重试
+
+## 参考资料
+
+详细的 API 调用示例和响应格式见 `references/api-examples.md`。
+
+## 注意事项
+
+1. **Token 安全**：不要在公开场合分享频道 Token
+2. **内容格式**：支持完整的 Markdown 语法
+3. **字符编码**：使用 UTF-8 编码
+4. **幂等性键**：建议使用有意义的键（如文章 URL、时间戳等）
+5. **认证方式**：必须使用 `Authorization: Bearer` 格式
