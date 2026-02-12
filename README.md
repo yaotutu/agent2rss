@@ -54,7 +54,76 @@ bun run start
 
 ## 📡 API 文档
 
-### 多频道管理 API
+### 发布文章 API
+
+#### POST `/api/channels/:channelId/posts`
+
+向指定频道发布文章（AI 友好接口）。
+
+**特点：**
+- 自动提取标题（从内容中提取第一个 # 标题）
+- 自动生成链接（如果未提供）
+- 支持 Markdown 和 HTML 格式
+- 需要频道级别的鉴权
+
+```bash
+POST /api/channels/{channel-id}/posts
+```
+
+**请求头:**
+```
+Content-Type: application/json
+Authorization: Bearer {channel-token}
+```
+
+**请求体:**
+```json
+{
+  "content": "# 文章标题\n\n文章内容...",  // 必填，支持 Markdown 或 HTML
+  "title": "自定义标题",                   // 可选，默认从 content 提取
+  "link": "https://example.com",           // 可选，默认自动生成
+  "contentType": "markdown",               // 可选: "auto", "markdown", "html"
+  "theme": "github",                       // 可选，覆盖频道默认主题
+  "description": "文章摘要",               // 可选，默认自动生成
+  "tags": ["标签1", "标签2"],              // 可选，支持数组或逗号分隔字符串
+  "author": "作者名"                       // 可选
+}
+```
+
+#### POST `/api/channels/:channelId/posts/upload`
+
+**新增功能**：上传 Markdown 文件创建文章。
+
+```bash
+POST /api/channels/{channel-id}/posts/upload
+```
+
+**请求头:**
+```
+Content-Type: multipart/form-data
+Authorization: Bearer {channel-token}
+```
+
+**表单字段:**
+- `file`: Markdown 文件 (.md 或 .markdown)
+- `title`: 可选，自定义标题（默认从文件中提取）
+- `link`: 可选，自定义链接（默认自动生成）
+- `contentType`: 可选，内容类型（"auto", "markdown", "html"）
+- `theme`: 可选，主题（覆盖频道默认主题）
+- `description`: 可选，描述（默认自动生成）
+- `author`: 可选，作者
+- `tags`: 可选，标签（逗号分隔字符串）
+
+**使用示例:**
+```bash
+curl -X POST "http://localhost:8765/api/channels/{channel-id}/posts/upload" \
+  -H "Authorization: Bearer {channel-token}" \
+  -F "file=@article.md" \
+  -F "title=自定义标题" \
+  -F "tags=技术,AI"
+```
+
+### 频道管理 API
 
 #### 创建频道
 ```bash
@@ -118,11 +187,7 @@ DELETE /api/channels/:id
 - 特别适合 AI 生成的内容（通常没有外部链接）
 - 详见：[AI 内容链接处理方案](docs/AI_CONTENT_LINKS.md)
 
-**鉴权**：Header 中需要 `X-Auth-Token: ${AUTH_TOKEN}`
-
-### GET /rss.xml
-
-获取聚合所有频道的 RSS 2.0 格式的 feed。
+**鉴权**：Header 中需要 `Authorization: Bearer <token>` (频道 token 或超级管理员 token)
 
 ### GET /channels/:id/rss.xml
 
@@ -193,34 +258,40 @@ DELETE /api/channels/:id
 ```bash
 curl -X POST http://localhost:8765/api/channels \
   -H "Content-Type: application/json" \
-  -H "X-Auth-Token: your-token" \
+  -H "Authorization: Bearer your-admin-token" \
   -d '{
-    "id": "tech",
     "name": "科技频道",
     "description": "最新科技资讯和趋势",
     "theme": "github"
   }'
 ```
 
-#### 步骤 2：发布文章到频道
+#### 步骤 2：发布文章到频道（JSON 方式）
 
 ```bash
-curl -X POST http://localhost:8765/api/webhook \
+curl -X POST http://localhost:8765/api/channels/{channel-id}/posts \
   -H "Content-Type: application/json" \
-  -H "X-Auth-Token: your-token" \
+  -H "Authorization: Bearer {channel-token}" \
   -d '{
     "title": "如何使用 Bun",
-    "link": "https://blog.example.com/bun-guide",
     "content": "# Bun 入门\n\n## 安装\n\n```bash\ncurl -fsSL https://bun.sh/install | bash\n```",
-    "channel": "tech",
     "tags": ["技术", "Bun"]
   }'
 ```
 
-#### 步骤 3：订阅频道 RSS
+#### 步骤 3：发布文章到频道（文件上传方式）
+
+```bash
+curl -X POST "http://localhost:8765/api/channels/{channel-id}/posts/upload" \
+  -H "Authorization: Bearer {channel-token}" \
+  -F "file=@article.md" \
+  -F "tags=技术,AI"
+```
+
+#### 步骤 4：订阅频道 RSS
 
 ```
-http://localhost:8765/channels/tech/rss.xml
+http://localhost:8765/channels/{channel-id}/rss.xml
 ```
 
 ### 示例 2：多频道管理
@@ -229,27 +300,27 @@ http://localhost:8765/channels/tech/rss.xml
 # 创建多个频道
 curl -X POST http://localhost:8765/api/channels \
   -H "Content-Type: application/json" \
-  -H "X-Auth-Token: your-token" \
-  -d '{"id": "news", "name": "新闻频道", "description": "每日新闻"}'
+  -H "Authorization: Bearer your-admin-token" \
+  -d '{"name": "新闻频道", "description": "每日新闻"}'
 
 curl -X POST http://localhost:8765/api/channels \
   -H "Content-Type: application/json" \
-  -H "X-Auth-Token: your-token" \
-  -d '{"id": "blog", "name": "博客频道", "description": "个人博客"}'
+  -H "Authorization: Bearer your-admin-token" \
+  -d '{"name": "博客频道", "description": "个人博客"}'
 
 # 查看所有频道
 curl http://localhost:8765/api/channels
 
-# 发布到不同频道
-curl -X POST http://localhost:8765/api/webhook \
+# 发布到不同频道（JSON 方式）
+curl -X POST http://localhost:8765/api/channels/{channel-id}/posts \
   -H "Content-Type: application/json" \
-  -H "X-Auth-Token: your-token" \
-  -d '{"title": "新闻", "link": "...", "content": "...", "channel": "news"}'
+  -H "Authorization: Bearer {channel-token}" \
+  -d '{"title": "新闻", "content": "新闻内容...", "channel": "news"}'
 
-curl -X POST http://localhost:8765/api/webhook \
-  -H "Content-Type: application/json" \
-  -H "X-Auth-Token: your-token" \
-  -d '{"title": "博客", "link": "...", "content": "...", "channel": "blog"}'
+# 发布到不同频道（文件上传方式）
+curl -X POST "http://localhost:8765/api/channels/{channel-id}/posts/upload" \
+  -H "Authorization: Bearer {channel-token}" \
+  -F "file=@news_article.md"
 ```
 
 ### 示例 3：订阅 RSS Feed
@@ -326,8 +397,9 @@ bun run dev
 
 ### 鉴权失败
 
-1. 确认 `X-Auth-Token` header 正确
+1. 确认 `Authorization: Bearer <token>` header 正确
 2. 检查环境变量 `AUTH_TOKEN` 是否设置
+3. 确保使用正确的 token 类型（频道 token 或超级管理员 token）
 
 ## 📄 许可证
 

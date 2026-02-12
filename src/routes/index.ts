@@ -144,6 +144,7 @@ export function createRoutes() {
       swagger: 'GET /swagger',
       health: 'GET /health',
       createPost: 'POST /api/channels/:channelId/posts',
+      uploadPost: 'POST /api/channels/:channelId/posts/upload',
       getChannelFeed: 'GET /channels/:id/rss.xml',
       listChannels: 'GET /api/channels',
       getChannel: 'GET /api/channels/:id',
@@ -392,6 +393,269 @@ export function createRoutes() {
       tags: ['Posts']
     }
   });
+
+  // ============================================================
+  // 文件上传 - 上传 Markdown 文件
+  // ============================================================
+
+  app.post('/api/channels/:channelId/posts/upload', async ({ params, headers, set, body }) => {
+    const channelId = params.channelId;
+
+    // 鉴权检查 - 使用标准 Authorization: Bearer
+    const authHeader = headers['authorization'];
+    const authToken = authHeader?.replace('Bearer ', '');
+
+    if (!authToken) {
+      set.status = 401;
+      return {
+        success: false,
+        error: 'Authorization header missing or invalid',
+        details: {
+          expected: 'Authorization: Bearer <token>',
+          help: 'Provide a channel token (ch_xxx) or admin AUTH_TOKEN'
+        }
+      };
+    }
+
+    // 验证 token
+    const authResult = await verifyToken(authToken, channelId);
+    if (!authResult.authorized) {
+      set.status = 401;
+      return {
+        success: false,
+        error: authResult.error || 'Unauthorized',
+        details: authResult.details
+      };
+    }
+
+    // 验证频道是否存在
+    const channel = await readChannel(channelId);
+    if (!channel) {
+      set.status = 404;
+      return {
+        success: false,
+        error: `Channel "${channelId}" not found`,
+        details: {
+          channelId,
+          help: 'Use GET /api/channels to list all available channels'
+        }
+      };
+    }
+
+    try {
+      // Access the file and other fields from the body as defined in the schema
+      const { file, title, link, contentType, theme, description, author, tags } = body;
+
+      // Check if file exists and is a proper file
+      if (!file || typeof file === 'string' || !(file instanceof File)) {
+        set.status = 400;
+        return {
+          success: false,
+          error: 'Missing required field: file',
+          details: {
+            field: 'file',
+            issue: 'Required field missing or not a file',
+            expected: { file: 'markdown file' },
+            example: { file: 'article.md' }
+          }
+        };
+      }
+
+      // 验证文件类型
+      const fileName = file.name;
+      const fileExtension = fileName.toLowerCase().split('.').pop();
+
+      if (!fileName.toLowerCase().endsWith('.md') && !fileName.toLowerCase().endsWith('.markdown')) {
+        set.status = 400;
+        return {
+          success: false,
+          error: 'Invalid file type',
+          details: {
+            field: 'file',
+            issue: 'File must have .md or .markdown extension',
+            provided: fileExtension,
+            expected: ['.md', '.markdown'],
+            example: 'article.md'
+          }
+        };
+      }
+
+      // 读取文件内容
+      const fileContent = await file.text();
+
+      // 验证内容不为空
+      if (!fileContent.trim()) {
+        set.status = 400;
+        return {
+          success: false,
+          error: 'File content is empty',
+          details: {
+            field: 'file',
+            issue: 'Uploaded file is empty',
+            example: 'File must contain markdown content'
+          }
+        };
+      }
+
+      // 自动提取标题（如果未提供）
+      let postTitle = title;
+      if (!postTitle) {
+        postTitle = extractTitleFromMarkdown(fileContent);
+      }
+      if (!postTitle) {
+        postTitle = 'Untitled Post';
+      }
+
+      // 内容类型自动检测或使用指定值
+      let contentTypeValue = contentType || 'auto';
+      if (contentTypeValue === 'auto') {
+        // 简单的启发式检测：如果包含 HTML 标签，则认为是 HTML
+        contentTypeValue = fileContent.trimStart().startsWith('<') ? 'html' : 'markdown';
+      }
+
+      // 内容处理
+      const effectiveTheme = theme || channel.theme || CONFIG.content.defaultTheme;
+      const html = contentTypeValue === 'html'
+        ? fileContent
+        : markdownToHtml(fileContent, effectiveTheme);
+
+      const summary = description || generateSummary(html, CONFIG.content.defaultSummaryLength);
+
+      // 生成文章 ID
+      const postId = generateId();
+
+      // 自动生成链接（如果未提供）
+      const postLinkValue = link || `${CONFIG.feed.url}/channels/${channelId}/posts/${postId}`;
+
+      // 处理标签（支持字符串或数组）
+      let tagsArray: string[] | undefined = undefined;
+      if (tags) {
+        if (Array.isArray(tags)) {
+          tagsArray = tags;
+        } else if (typeof tags === 'string') {
+          tagsArray = tags.split(',').map(t => t.trim()).filter(t => t);
+        }
+      }
+
+      // 创建新文章
+      const newPost = {
+        id: postId,
+        title: postTitle,
+        link: postLinkValue,
+        content: html,
+        contentMarkdown: fileContent,
+        summary,
+        tags: tagsArray,
+        author,
+        pubDate: new Date(),
+        channel: channelId,
+      };
+
+      // 保存到指定频道
+      await addPost(newPost, channelId);
+
+      return {
+        success: true,
+        message: `Post created successfully in channel "${channelId}" from uploaded file "${fileName}"`,
+        post: {
+          id: newPost.id,
+          title: newPost.title,
+          channel: channelId,
+          pubDate: newPost.pubDate
+        }
+      };
+    } catch (error) {
+      console.error('File upload error:', error);
+
+      if (error instanceof TypeError && error.message.includes('form data')) {
+        set.status = 400;
+        return {
+          success: false,
+          error: 'Invalid multipart form data',
+          details: {
+            issue: 'Could not parse multipart form data',
+            expected: 'Correct multipart/form-data format with file field',
+            example: 'curl -X POST ... -F "file=@article.md"'
+          }
+        };
+      }
+
+      set.status = 500;
+      return {
+        success: false,
+        error: 'Server error processing file upload',
+        details: {
+          error: error instanceof Error ? error.message : 'Unknown error'
+        }
+      };
+    }
+  }, {
+    params: t.Object({
+      channelId: t.String({
+        description: '频道 ID',
+        examples: ['8cf83b0d-f856-4f7c-bd1c-4f6ca0338ece']
+      })
+    }),
+    body: t.Object({
+      file: t.Any(), // Raw file object from multipart
+      title: t.Optional(t.String()),
+      link: t.Optional(t.String()),
+      contentType: t.Optional(t.Union([
+        t.Literal('auto'),
+        t.Literal('markdown'),
+        t.Literal('html')
+      ])),
+      theme: t.Optional(t.String()),
+      description: t.Optional(t.String()),
+      author: t.Optional(t.String()),
+      tags: t.Optional(t.String())
+    }),
+    type: 'multipart/form-data',
+    response: {
+      200: t.Object({
+        success: t.Boolean({ examples: [true] }),
+        message: t.String({ examples: ['Post created successfully in channel "xxx" from uploaded file "article.md"'] }),
+        post: t.Object({
+          id: t.String(),
+          title: t.String(),
+          channel: t.String(),
+          pubDate: t.Date()
+        })
+      }),
+      400: t.Object({
+        success: t.Boolean({ examples: [false] }),
+        error: t.String({ examples: ['Missing required field: file'] }),
+        details: t.Object({
+          field: t.String(),
+          issue: t.String(),
+          expected: t.Any(),
+          example: t.Any()
+        })
+      }),
+      401: t.Object({
+        success: t.Boolean({ examples: [false] }),
+        error: t.String({ examples: ['Unauthorized'] }),
+        details: t.Object({
+          expected: t.String(),
+          help: t.String()
+        })
+      }),
+      404: t.Object({
+        success: t.Boolean({ examples: [false] }),
+        error: t.String({ examples: ['Channel "xxx" not found'] }),
+        details: t.Object({
+          channelId: t.String(),
+          help: t.String()
+        })
+      })
+    },
+    detail: {
+      summary: '通过文件上传创建文章',
+      description: '通过上传 Markdown 文件向指定频道添加新文章。自动提取标题、生成链接和摘要。支持 Markdown 和 HTML 格式。需要在请求头中提供该频道的 token (Authorization: Bearer) 进行鉴权。上传的文件必须以 .md 或 .markdown 结尾。',
+      tags: ['Posts']
+    }
+  });
+
   // ============================================================
   // ============================================================
   // 文本内容上传接口 - 最简单的推送方式（纯文本）
