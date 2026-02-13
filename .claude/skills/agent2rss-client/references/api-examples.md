@@ -391,31 +391,7 @@ console.log('Hello, World!');
 \`\`\`
 ```
 
-### 3. 批量推送
-
-可以使用脚本批量推送多篇文章：
-
-```bash
-#!/bin/bash
-
-POSTS_URL="http://localhost:8765/api/channels/YOUR_CHANNEL_ID/posts"
-TOKEN="ch_YOUR_TOKEN"
-
-for file in articles/*.md; do
-  title=$(basename "$file" .md)
-  content=$(cat "$file")
-  idempotency_key="article-$(basename "$file")"
-
-  curl -X POST "$POSTS_URL" \
-    -H "Content-Type: application/json" \
-    -H "Authorization: Bearer $TOKEN" \
-    -d "{\"content\": $(jq -Rs . <<< "$content"), \"idempotencyKey\": \"$idempotency_key\"}"
-
-  sleep 1
-done
-```
-
-### 4. 测试连接
+### 3. 测试连接
 
 快速测试服务器是否可用：
 
