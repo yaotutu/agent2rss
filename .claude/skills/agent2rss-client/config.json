@@ -1,6 +1,6 @@
 {
   "serverUrl": "http://agent2rss.yaotutu.top:8765",
-  "currentChannelId": "72d5b9e9-432d-4cf9-ac8a-086f4524096b",
+  "defaultChannelId": "72d5b9e9-432d-4cf9-ac8a-086f4524096b",
   "channels": [
     {
       "id": "72d5b9e9-432d-4cf9-ac8a-086f4524096b",

@@ -224,7 +224,9 @@ curl http://localhost:8765/channels/default/rss.xml
 
 **端点**: `GET /api/channels`
 
-**鉴权**: 需要超级管理员 Token
+**鉴权**: 🔒 需要超级管理员 Token（必需）
+
+**说明**: 此接口仅限超级管理员访问，用于管理和查看所有频道信息。
 
 **示例**：
 
@@ -244,7 +246,7 @@ curl http://localhost:8765/api/channels \
     "theme": "spring",
     "language": "zh-CN",
     "maxPosts": 100,
-    "token": "ch_xxx",  // 只有超级管理员可见
+    "token": "ch_xxx",  // 超级管理员可见所有频道 token
     "postCount": 42,
     "createdAt": "2026-02-05T13:35:41.183Z",
     "updatedAt": "2026-02-05T13:35:41.183Z"
@@ -252,11 +254,36 @@ curl http://localhost:8765/api/channels \
 ]
 ```
 
+**错误响应**：
+
+- **401 Unauthorized**: 缺少 Authorization header
+  ```json
+  {
+    "success": false,
+    "error": "Authorization header missing",
+    "details": {
+      "expected": "Authorization: Bearer <admin-token>",
+      "help": "This endpoint requires super admin token (AUTH_TOKEN)"
+    }
+  }
+  ```
+
+- **403 Forbidden**: Token 无效或非超级管理员
+  ```json
+  {
+    "success": false,
+    "error": "Forbidden: Super admin token required",
+    "details": {
+      "help": "Only super admin can list all channels"
+    }
+  }
+  ```
+
 #### 3.2 获取单个频道
 
 **端点**: `GET /api/channels/:id`
 
-**鉴权**: 需要频道 Token 或超级管理员 Token
+**鉴权**: 无需鉴权（公开访问）
 
 **示例**：
 

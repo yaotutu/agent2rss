@@ -150,11 +150,14 @@ curl -X POST http://localhost:8765/api/webhook \
 
 **端点**: `GET /api/channels`
 
-**无需鉴权**
+**鉴权**: 🔒 需要超级管理员 Token（必需）
+
+**说明**: 此接口仅限超级管理员访问，用于管理和查看所有频道信息。
 
 **示例**:
 ```bash
-curl http://localhost:8765/api/channels
+curl http://localhost:8765/api/channels \
+  -H 'Authorization: Bearer YOUR_AUTH_TOKEN'
 ```
 
 **响应**:
@@ -167,6 +170,7 @@ curl http://localhost:8765/api/channels
     "theme": "spring",
     "language": "zh-CN",
     "maxPosts": null,
+    "token": "ch_xxx",  // 超级管理员可见所有频道 token
     "postCount": 5,
     "createdAt": "2025-01-15T00:00:00.000Z",
     "updatedAt": "2025-01-15T00:00:00.000Z"
@@ -178,6 +182,7 @@ curl http://localhost:8765/api/channels
     "theme": "github",
     "language": "zh-CN",
     "maxPosts": null,
+    "token": "ch_yyy",  // 超级管理员可见所有频道 token
     "postCount": 10,
     "createdAt": "2025-01-15T10:00:00.000Z",
     "updatedAt": "2025-01-15T10:00:00.000Z"
@@ -185,13 +190,17 @@ curl http://localhost:8765/api/channels
 ]
 ```
 
+**错误响应**:
+- **401**: 缺少 Authorization header
+- **403**: Token 无效或非超级管理员
+
 ---
 
 ### 4. 获取单个频道
 
 **端点**: `GET /api/channels/:id`
 
-**无需鉴权**
+**鉴权**: 无需鉴权（公开访问）
 
 **示例**:
 ```bash

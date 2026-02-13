@@ -35,7 +35,7 @@ description: Agent2RSS 服务客户端，帮助用户管理 RSS 频道和推送�
      ```json
      {
        "serverUrl": "http://agent2rss.yaotutu.top:8765",
-       "currentChannelId": "返回的频道ID",
+       "defaultChannelId": "返回的频道ID",
        "channels": [{
          "id": "返回的频道ID",
          "name": "频道名",
@@ -53,7 +53,7 @@ description: Agent2RSS 服务客户端，帮助用户管理 RSS 频道和推送�
 ```json
 {
   "serverUrl": "http://agent2rss.yaotutu.top:8765",
-  "currentChannelId": "default",
+  "defaultChannelId": "default",
   "channels": [
     {
       "id": "default",
@@ -197,20 +197,22 @@ curl -X POST {postsUrl} \
 1. **检查并初始化配置**：
    - 读取 `config.json`
    - 如果不存在，执行自动初始化流程（创建频道并保存配置）
-2. **从配置读取数据**：
+2. **确定目标频道**：
+   - 如果用户明确指定频道（如"发布到技术博客频道"），使用指定的频道
+   - 否则使用 `defaultChannelId` 对应的频道
+3. **从配置读取数据**：
    - `serverUrl`: 服务器地址
-   - `currentChannelId`: 当前频道 ID
-   - `token`: 从 `channels` 数组中找到对应频道的 token
-3. 准备 Markdown 文件
-4. **使用文件上传方式推送**（推荐）：
+   - `token`: 从 `channels` 数组中找到目标频道的 token
+4. 准备 Markdown 文件
+5. **使用文件上传方式推送**（推荐）：
    ```bash
-   curl -X POST "{config.serverUrl}/api/channels/{config.currentChannelId}/posts/upload" \
-     -H "Authorization: Bearer {config.channels[].token}" \
+   curl -X POST "{config.serverUrl}/api/channels/{targetChannelId}/posts/upload" \
+     -H "Authorization: Bearer {targetChannel.token}" \
      -F "file=@article.md" \
      -F "idempotencyKey=unique-key"
    ```
-5. 检查响应中的 `isNew` 字段
-6. **返回 RSS Feed URL**：`{config.serverUrl}/channels/{config.currentChannelId}/rss.xml`
+6. 检查响应中的 `isNew` 字段
+7. **返回 RSS Feed URL**：`{config.serverUrl}/channels/{targetChannelId}/rss.xml`
 
 ### 创建新频道
 
@@ -225,8 +227,115 @@ curl -X POST {postsUrl} \
 4. 保存返回的频道 ID 和 Token 到 `config.json`：
    - 添加到 `channels` 数组
    - 构建 `postsUrl` 和 `rssUrl`（基于 `serverUrl`）
-5. 可选：更新 `currentChannelId` 为新频道
+5. 可选：更新 `defaultChannelId` 为新频道
 6. **提供 RSS Feed URL**：`{config.serverUrl}/channels/{channelId}/rss.xml`
+
+### 查看本地频道列表
+
+1. **读取 config.json**
+2. **显示 channels 数组中的所有频道**：
+   - 频道 ID
+   - 频道名称
+   - RSS Feed URL
+   - 是否为默认频道（defaultChannelId）
+3. 格式化输出供用户查看
+
+### 设置默认频道
+
+1. **读取 config.json**
+2. **显示可用频道列表**（从 channels 数组）
+3. **让用户选择要设为默认的频道**
+4. **更新 config.json 中的 defaultChannelId**
+5. **确认设置成功**，提供该频道的 RSS Feed URL
+
+### 更新频道配置
+
+修改频道的名称或描述。
+
+**需要认证**：频道 Token
+
+**可更新字段**（仅限以下两个）：
+- `name` - 频道名称
+- `description` - 频道描述
+
+**工作流程**：
+1. 从 config.json 读取指定频道（或默认频道）的 ID 和 token
+2. 提示用户要修改的字段（name 或 description）
+3. 调用更新频道 API：
+   ```bash
+   curl -X PUT "{config.serverUrl}/api/channels/{channelId}" \
+     -H "Authorization: Bearer {token}" \
+     -H "Content-Type: application/json" \
+     -d '{"name":"新名称","description":"新描述"}'
+   ```
+4. 更新成功后，同步更新本地 config.json 中对应频道的信息
+
+### 删除频道
+
+永久删除一个频道及其所有文章。
+
+**需要认证**：频道 Token
+
+⚠️ **警告**：此操作不可撤销，会删除频道的所有文章。
+
+**工作流程**：
+1. 读取 config.json 显示所有频道
+2. 让用户选择要删除的频道
+3. **显示频道信息并要求用户确认**（防止误删）
+4. 从 config.json 读取该频道的 token
+5. 调用删除频道 API：
+   ```bash
+   curl -X DELETE "{config.serverUrl}/api/channels/{channelId}" \
+     -H "Authorization: Bearer {token}"
+   ```
+6. 删除成功后，从 config.json 的 channels 数组中移除该频道
+7. 如果删除的是 defaultChannelId：
+   - 如果还有其他频道，自动将第一个可用频道设为默认
+   - 如果没有其他频道，将 defaultChannelId 设为 null，提示用户创建新频道
+
+## 常用场景
+
+### 场景 1：发布到指定频道
+
+**用户需求**：我有多个频道，想发布内容到特定频道
+
+**操作步骤**：
+1. 用户明确表达"发布到 xxx 频道"
+2. 从 config.json 的 channels 数组中查找匹配的频道
+3. 使用该频道的 token 和 ID 发布内容
+4. 如果未指定频道，使用 defaultChannelId
+
+### 场景 2：设置默认频道
+
+**用户需求**：我想把"技术博客"设为默认频道
+
+**操作步骤**：
+1. 读取 config.json 显示所有频道
+2. 让用户选择要设为默认的频道
+3. 更新 defaultChannelId
+4. 确认设置成功
+
+### 场景 3：修改频道名称或描述
+
+**用户需求**：我想修改频道的名称
+
+**操作步骤**：
+1. 从 config.json 读取指定频道（或默认频道）的 ID 和 token
+2. 提示用户输入新的名称或描述
+3. 调用 `PUT {serverUrl}/api/channels/{channelId}` 更新
+4. 同步更新本地 config.json
+
+### 场景 4：删除不需要的频道
+
+**用户需求**：我创建了一个测试频道，现在想删除它
+
+**操作步骤**：
+1. 读取 config.json 显示所有频道
+2. 让用户选择要删除的频道
+3. 显示频道信息并要求确认
+4. 调用 `DELETE {serverUrl}/api/channels/{channelId}` 删除
+5. 从 config.json 中移除该频道
+6. 如果删除的是默认频道，自动设置新的默认频道
 
 ## 错误处理
 
