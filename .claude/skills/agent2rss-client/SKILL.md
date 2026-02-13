@@ -43,11 +43,46 @@ description: Agent2RSS 服务客户端，帮助用户管理 RSS 频道和推送�
 **标准 Bearer Token 认证**（必需）：
 
 ```bash
-Authorization: Bearer <token>
+Authorization: Bearer <channel-token>
 ```
 
-- **频道 Token**：格式 `ch_xxx...`，用于频道级操作
-- **超级管理员 Token**：环境变量 `AUTH_TOKEN`，用于全局管理
+每个频道有独立的 Token（格式 `ch_xxx...`），创建频道时生成。
+
+## 推荐的推送方式
+
+### ⚠️ 重要：避免 JSON 转义问题
+
+直接在 JSON 请求体中放置 Markdown 内容容易出现转义问题（引号、换行符、反斜杠等）。
+
+**强烈推荐使用文件上传方式**：
+
+### 文件上传（推荐）✅
+
+直接上传 Markdown 文件，无需处理 JSON 转义：
+
+```bash
+curl -X POST {serverUrl}/api/channels/{channelId}/posts/upload \
+  -H "Authorization: Bearer {token}" \
+  -F "file=@article.md" \
+  -F "idempotencyKey=article-001"
+```
+
+**优点**：
+- 无需处理 JSON 转义
+- 最简单可靠
+- 支持所有 Markdown 语法
+- 自动提取标题
+- 支持幂等性
+
+**可选字段**：
+- `title` - 自定义标题
+- `tags` - 标签（逗号分隔）
+- `author` - 作者名
+- `idempotencyKey` - 防止重复发布
+
+### JSON 方式（仅适合简单内容）
+
+如果内容简单且已正确转义，可以使用 JSON 方式。但对于包含复杂 Markdown 的内容，请使用文件上传。
 
 ## 常用操作
 
@@ -64,7 +99,9 @@ curl -X POST {serverUrl}/api/channels \
 
 响应包含频道 ID 和 Token，保存到 `config.json`。
 
-### 2. 推送内容（JSON 方式）
+### 2. 推送内容（JSON 方式 - 仅适合简单内容）
+
+⚠️ **警告**：JSON 方式容易出现转义问题，推荐使用文件上传方式（见上方"推荐的推送方式"章节）。
 
 **最简调用**（仅内容，标题自动提取）：
 
@@ -74,23 +111,6 @@ curl -X POST {postsUrl} \
   -H "Authorization: Bearer {token}" \
   -d '{
     "content": "# 标题\n\n内容..."
-  }'
-```
-
-**完整参数**：
-
-```bash
-curl -X POST {postsUrl} \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer {token}" \
-  -d '{
-    "content": "# 标题\n\n内容...",
-    "title": "自定义标题",
-    "link": "https://example.com/article",
-    "contentType": "markdown",
-    "author": "作者名",
-    "tags": ["技术", "教程"],
-    "idempotencyKey": "article-2024-01-01-001"
   }'
 ```
 
@@ -110,18 +130,7 @@ curl -X POST {postsUrl} \
 }
 ```
 
-### 3. 推送内容（文件上传方式）
-
-```bash
-curl -X POST {serverUrl}/api/channels/{channelId}/posts/upload \
-  -H "Authorization: Bearer {token}" \
-  -F "file=@article.md" \
-  -F "title=自定义标题" \
-  -F "tags=技术,教程" \
-  -F "idempotencyKey=article-2024-01-01-001"
-```
-
-### 4. 幂等性支持
+### 3. 幂等性支持
 
 使用 `idempotencyKey` 防止重复发布：
 
@@ -152,19 +161,17 @@ curl -X POST {postsUrl} \
 ### 推送单篇文章
 
 1. 从 `config.json` 读取当前频道配置
-2. 准备文章内容（Markdown 或 HTML）
-3. 选择推送方式：
-   - **JSON 方式**：适合程序化调用，内容在请求体中
-   - **文件上传方式**：适合已有 Markdown 文件的场景
+2. 准备 Markdown 文件
+3. **使用文件上传方式推送**（推荐）
 4. 可选添加 `idempotencyKey` 防止重复
-5. 发送请求并检查响应中的 `isNew` 字段
+5. 检查响应中的 `isNew` 字段
 6. 提供 RSS Feed URL 供用户订阅
 
 ### 批量推送文章
 
-1. 遍历文章列表
-2. 为每篇文章生成唯一的 `idempotencyKey`（如：`article-{timestamp}-{index}`）
-3. 使用 JSON 或文件上传方式推送
+1. 遍历 Markdown 文件列表
+2. 为每个文件生成唯一的 `idempotencyKey`
+3. 使用文件上传方式逐个推送
 4. 检查 `isNew` 字段，跳过已存在的文章
 5. 推送间隔建议至少 1 秒
 

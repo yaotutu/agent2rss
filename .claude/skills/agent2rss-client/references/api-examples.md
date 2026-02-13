@@ -132,7 +132,7 @@ curl -X POST http://localhost:8765/api/channels/8cf83b0d-f856-4f7c-bd1c-4f6ca033
 
 **请求头**:
 - `Content-Type: application/json`（必填）
-- `Authorization: Bearer <token>`（必填，频道 Token 或超级管理员 Token）
+- `Authorization: Bearer <channel-token>`（必填，使用频道 Token）
 
 **响应字段**:
 - `isNew`: 是否为新创建的文章（`true` 表示新创建，`false` 表示已存在）
@@ -292,8 +292,8 @@ curl -X GET http://localhost:8765/channels/8cf83b0d-f856-4f7c-bd1c-4f6ca0338ece/
   "success": false,
   "error": "Authorization header missing or invalid",
   "details": {
-    "expected": "Authorization: Bearer <token>",
-    "help": "Provide a channel token (ch_xxx) or admin AUTH_TOKEN"
+    "expected": "Authorization: Bearer <channel-token>",
+    "help": "Provide the channel token (ch_xxx)"
   }
 }
 ```
@@ -336,7 +336,26 @@ curl -X GET http://localhost:8765/channels/8cf83b0d-f856-4f7c-bd1c-4f6ca0338ece/
 
 ## 使用技巧
 
-### 1. 幂等性防止重复发布
+### 1. 推荐使用文件上传（重要）
+
+**强烈推荐**：使用文件上传方式推送 Markdown 内容
+
+```bash
+curl -X POST "http://localhost:8765/api/channels/default/posts/upload" \
+  -H "Authorization: Bearer ch_xxx" \
+  -F "file=@article.md" \
+  -F "idempotencyKey=article-001"
+```
+
+**优点**：
+- 无需处理 JSON 转义
+- 支持所有 Markdown 语法
+- 自动提取标题和生成摘要
+- 最简单可靠
+
+**不推荐**：直接在 JSON 请求体中放置复杂 Markdown 内容，容易出现转义问题。
+
+### 2. 幂等性防止重复发布
 
 使用 `idempotencyKey` 确保相同内容不会重复发布：
 
