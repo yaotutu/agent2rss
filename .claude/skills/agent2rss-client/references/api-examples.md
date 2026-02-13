@@ -2,9 +2,47 @@
 
 本文档提供完整的 API 调用示例，包括请求格式和响应示例。
 
+## 配置管理
+
+### 初始化配置
+
+首次使用时，Skill 会自动创建配置文件：
+
+```bash
+# 配置文件位置
+.claude/skills/agent2rss-client/config.json
+
+# 配置文件结构
+{
+  "serverUrl": "http://agent2rss.yaotutu.top:8765",  # 服务器地址
+  "currentChannelId": "default",                      # 当前使用的频道 ID
+  "channels": [
+    {
+      "id": "default",
+      "name": "默认频道",
+      "token": "ch_xxx...",
+      "postsUrl": "http://agent2rss.yaotutu.top:8765/api/channels/default/posts",
+      "rssUrl": "http://agent2rss.yaotutu.top:8765/channels/default/rss.xml"
+    }
+  ]
+}
+```
+
+### 验证配置
+
+```bash
+# 测试服务器连接
+curl http://agent2rss.yaotutu.top:8765/health
+
+# 获取频道列表
+curl http://agent2rss.yaotutu.top:8765/api/channels
+```
+
+**重要**：所有 API 调用都必须使用 `config.json` 中的 `serverUrl`，不要硬编码 localhost。
+
 ## 基础信息
 
-- **默认服务器**: `http://localhost:8765`
+- **默认服务器**: `http://agent2rss.yaotutu.top:8765`（从 config.json 读取）
 - **API 基础路径**: `/api`
 - **内容类型**: `application/json`
 - **认证方式**: `Authorization: Bearer <token>`
@@ -14,7 +52,7 @@
 ### 请求
 
 ```bash
-curl -X POST http://localhost:8765/api/channels \
+curl -X POST http://agent2rss.yaotutu.top:8765/api/channels \
   -H "Content-Type: application/json" \
   -d '{
     "name": "技术博客",
@@ -37,7 +75,7 @@ curl -X POST http://localhost:8765/api/channels \
     "maxPosts": 100,
     "createdAt": "2026-02-05T10:30:00.000Z"
   },
-  "rssUrl": "http://localhost:8765/channels/8cf83b0d-f856-4f7c-bd1c-4f6ca0338ece/rss.xml"
+  "rssUrl": "http://agent2rss.yaotutu.top:8765/channels/8cf83b0d-f856-4f7c-bd1c-4f6ca0338ece/rss.xml"
 }
 ```
 
@@ -58,7 +96,7 @@ curl -X POST http://localhost:8765/api/channels \
 ### 请求（最简参数 - 仅内容）
 
 ```bash
-curl -X POST http://localhost:8765/api/channels/8cf83b0d-f856-4f7c-bd1c-4f6ca0338ece/posts \
+curl -X POST http://agent2rss.yaotutu.top:8765/api/channels/8cf83b0d-f856-4f7c-bd1c-4f6ca0338ece/posts \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer ch_4fd9cdce724ffb8d6ec69187b5438ae2" \
   -d '{
@@ -69,7 +107,7 @@ curl -X POST http://localhost:8765/api/channels/8cf83b0d-f856-4f7c-bd1c-4f6ca033
 ### 请求（完整参数）
 
 ```bash
-curl -X POST http://localhost:8765/api/channels/8cf83b0d-f856-4f7c-bd1c-4f6ca0338ece/posts \
+curl -X POST http://agent2rss.yaotutu.top:8765/api/channels/8cf83b0d-f856-4f7c-bd1c-4f6ca0338ece/posts \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer ch_4fd9cdce724ffb8d6ec69187b5438ae2" \
   -d '{
@@ -142,7 +180,7 @@ curl -X POST http://localhost:8765/api/channels/8cf83b0d-f856-4f7c-bd1c-4f6ca033
 ### 请求
 
 ```bash
-curl -X POST http://localhost:8765/api/channels/8cf83b0d-f856-4f7c-bd1c-4f6ca0338ece/posts/upload \
+curl -X POST http://agent2rss.yaotutu.top:8765/api/channels/8cf83b0d-f856-4f7c-bd1c-4f6ca0338ece/posts/upload \
   -H "Authorization: Bearer ch_4fd9cdce724ffb8d6ec69187b5438ae2" \
   -F "file=@article.md" \
   -F "title=自定义标题" \
@@ -190,7 +228,7 @@ curl -X POST http://localhost:8765/api/channels/8cf83b0d-f856-4f7c-bd1c-4f6ca033
 ### 请求
 
 ```bash
-curl -X GET http://localhost:8765/api/channels
+curl -X GET http://agent2rss.yaotutu.top:8765/api/channels
 ```
 
 ### 响应示例
@@ -226,7 +264,7 @@ curl -X GET http://localhost:8765/api/channels
 ### 请求
 
 ```bash
-curl -X GET http://localhost:8765/api/channels/8cf83b0d-f856-4f7c-bd1c-4f6ca0338ece
+curl -X GET http://agent2rss.yaotutu.top:8765/api/channels/8cf83b0d-f856-4f7c-bd1c-4f6ca0338ece
 ```
 
 ### 响应示例
@@ -244,7 +282,7 @@ curl -X GET http://localhost:8765/api/channels/8cf83b0d-f856-4f7c-bd1c-4f6ca0338
     "createdAt": "2026-02-05T10:30:00.000Z",
     "updatedAt": "2026-02-05T15:30:00.000Z"
   },
-  "rssUrl": "http://localhost:8765/channels/8cf83b0d-f856-4f7c-bd1c-4f6ca0338ece/rss.xml"
+  "rssUrl": "http://agent2rss.yaotutu.top:8765/channels/8cf83b0d-f856-4f7c-bd1c-4f6ca0338ece/rss.xml"
 }
 ```
 
@@ -253,7 +291,7 @@ curl -X GET http://localhost:8765/api/channels/8cf83b0d-f856-4f7c-bd1c-4f6ca0338
 ### 请求
 
 ```bash
-curl -X GET http://localhost:8765/channels/8cf83b0d-f856-4f7c-bd1c-4f6ca0338ece/rss.xml
+curl -X GET http://agent2rss.yaotutu.top:8765/channels/8cf83b0d-f856-4f7c-bd1c-4f6ca0338ece/rss.xml
 ```
 
 ### 响应示例
@@ -264,14 +302,14 @@ curl -X GET http://localhost:8765/channels/8cf83b0d-f856-4f7c-bd1c-4f6ca0338ece/
   <channel>
     <title>技术博客</title>
     <description>分享技术文章和教程</description>
-    <link>http://localhost:8765/channels/8cf83b0d-f856-4f7c-bd1c-4f6ca0338ece</link>
-    <atom:link href="http://localhost:8765/channels/8cf83b0d-f856-4f7c-bd1c-4f6ca0338ece/rss.xml" rel="self" type="application/rss+xml"/>
+    <link>http://agent2rss.yaotutu.top:8765/channels/8cf83b0d-f856-4f7c-bd1c-4f6ca0338ece</link>
+    <atom:link href="http://agent2rss.yaotutu.top:8765/channels/8cf83b0d-f856-4f7c-bd1c-4f6ca0338ece/rss.xml" rel="self" type="application/rss+xml"/>
     <lastBuildDate>Wed, 05 Feb 2026 15:30:00 GMT</lastBuildDate>
 
     <item>
       <title>如何使用 Agent2RSS</title>
       <description>详细介绍 Agent2RSS 的使用方法和功能特性</description>
-      <link>http://localhost:8765/channels/8cf83b0d-f856-4f7c-bd1c-4f6ca0338ece/posts/post_1234567890</link>
+      <link>http://agent2rss.yaotutu.top:8765/channels/8cf83b0d-f856-4f7c-bd1c-4f6ca0338ece/posts/post_1234567890</link>
       <guid>post_1234567890</guid>
       <pubDate>Wed, 05 Feb 2026 15:30:00 GMT</pubDate>
       <author>Claude</author>
@@ -341,7 +379,7 @@ curl -X GET http://localhost:8765/channels/8cf83b0d-f856-4f7c-bd1c-4f6ca0338ece/
 **强烈推荐**：使用文件上传方式推送 Markdown 内容
 
 ```bash
-curl -X POST "http://localhost:8765/api/channels/default/posts/upload" \
+curl -X POST "http://agent2rss.yaotutu.top:8765/api/channels/default/posts/upload" \
   -H "Authorization: Bearer ch_xxx" \
   -F "file=@article.md" \
   -F "idempotencyKey=article-001"
@@ -363,13 +401,13 @@ curl -X POST "http://localhost:8765/api/channels/default/posts/upload" \
 # 使用文章 URL 作为幂等性键
 IDEMPOTENCY_KEY="https://example.com/article-123"
 
-curl -X POST http://localhost:8765/api/channels/default/posts \
+curl -X POST http://agent2rss.yaotutu.top:8765/api/channels/default/posts \
   -H "Authorization: Bearer ch_xxx..." \
   -H "Content-Type: application/json" \
   -d "{\"content\":\"...\",\"idempotencyKey\":\"$IDEMPOTENCY_KEY\"}"
 ```
 
-### 2. Markdown 内容格式化
+### 3. Markdown 内容格式化
 
 推送内容时，可以使用完整的 Markdown 语法：
 
@@ -391,12 +429,12 @@ console.log('Hello, World!');
 \`\`\`
 ```
 
-### 3. 测试连接
+### 4. 测试连接
 
 快速测试服务器是否可用：
 
 ```bash
-curl http://localhost:8765/health
+curl http://agent2rss.yaotutu.top:8765/health
 ```
 
 ## 注意事项

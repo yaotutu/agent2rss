@@ -14,29 +14,63 @@ description: Agent2RSS 服务客户端，帮助用户管理 RSS 频道和推送�
 3. **幂等性支持** - 使用 idempotencyKey 防止重复发布
 4. **RSS 订阅** - 生成标准 RSS Feed 供阅读器订阅
 
-## 配置管理
+## 配置管理（自动化）
 
-技能使用 `config.json` 存储服务器地址和频道信息：
+### 首次使用自动初始化流程
+
+**重要**：每次执行任务前，必须先检查并初始化配置。
+
+1. **检查配置文件**：读取 `config.json`
+2. **如果不存在**：
+   - 使用默认服务器地址：`http://agent2rss.yaotutu.top:8765`（**永远不使用 localhost**）
+   - 询问用户频道名称（或使用默认值 "AI Briefing"）
+   - 调用 API 创建频道：
+     ```bash
+     curl -X POST "http://agent2rss.yaotutu.top:8765/api/channels" \
+       -H "Content-Type: application/json" \
+       -d '{"name":"频道名","description":"AI 生成的内容"}'
+     ```
+   - 从响应中获取频道 ID 和 Token
+   - 创建 config.json 并保存配置：
+     ```json
+     {
+       "serverUrl": "http://agent2rss.yaotutu.top:8765",
+       "currentChannelId": "返回的频道ID",
+       "channels": [{
+         "id": "返回的频道ID",
+         "name": "频道名",
+         "token": "返回的Token",
+         "postsUrl": "http://agent2rss.yaotutu.top:8765/api/channels/{id}/posts",
+         "rssUrl": "http://agent2rss.yaotutu.top:8765/channels/{id}/rss.xml"
+       }]
+     }
+     ```
+   - 继续执行推送任务
+3. **如果存在**：从 config.json 读取配置，继续执行
+
+### 配置文件结构
 
 ```json
 {
-  "serverUrl": "http://localhost:8765",
+  "serverUrl": "http://agent2rss.yaotutu.top:8765",
   "currentChannelId": "default",
   "channels": [
     {
       "id": "default",
       "name": "默认频道",
       "token": "ch_xxx...",
-      "postsUrl": "http://localhost:8765/api/channels/default/posts",
-      "rssUrl": "http://localhost:8765/channels/default/rss.xml"
+      "postsUrl": "http://agent2rss.yaotutu.top:8765/api/channels/default/posts",
+      "rssUrl": "http://agent2rss.yaotutu.top:8765/channels/default/rss.xml"
     }
   ]
 }
 ```
 
-### 配置初始化
-
-首次使用时，如果 `config.json` 不存在，从 `assets/config-template.json` 复制并提示用户配置服务器地址。
+**关键点**：
+- `serverUrl` 是必填项，不能是 localhost（除非用户明确配置）
+- 所有 API 调用必须使用 `config.json` 中的 `serverUrl`
+- 所有 RSS 地址必须使用 `config.json` 中的 `serverUrl`
+- 频道的 `postsUrl` 和 `rssUrl` 必须基于 `serverUrl` 构建
 
 ## 认证方式
 
@@ -160,20 +194,39 @@ curl -X POST {postsUrl} \
 
 ### 推送单篇文章
 
-1. 从 `config.json` 读取当前频道配置
-2. 准备 Markdown 文件
-3. **使用文件上传方式推送**（推荐）
-4. 可选添加 `idempotencyKey` 防止重复
+1. **检查并初始化配置**：
+   - 读取 `config.json`
+   - 如果不存在，执行自动初始化流程（创建频道并保存配置）
+2. **从配置读取数据**：
+   - `serverUrl`: 服务器地址
+   - `currentChannelId`: 当前频道 ID
+   - `token`: 从 `channels` 数组中找到对应频道的 token
+3. 准备 Markdown 文件
+4. **使用文件上传方式推送**（推荐）：
+   ```bash
+   curl -X POST "{config.serverUrl}/api/channels/{config.currentChannelId}/posts/upload" \
+     -H "Authorization: Bearer {config.channels[].token}" \
+     -F "file=@article.md" \
+     -F "idempotencyKey=unique-key"
+   ```
 5. 检查响应中的 `isNew` 字段
-6. 提供 RSS Feed URL 供用户订阅
+6. **返回 RSS Feed URL**：`{config.serverUrl}/channels/{config.currentChannelId}/rss.xml`
 
 ### 创建新频道
 
 1. 提示用户提供频道名称和描述
-2. 调用创建频道 API
-3. 保存返回的频道 ID 和 Token 到 `config.json`
-4. 更新 `currentChannelId` 为新频道
-5. 提供 RSS Feed URL
+2. **从 `config.json` 读取 `serverUrl`**（如果配置不存在，使用默认值 `http://agent2rss.yaotutu.top:8765`）
+3. 调用创建频道 API：
+   ```bash
+   curl -X POST "{config.serverUrl}/api/channels" \
+     -H "Content-Type: application/json" \
+     -d '{"name":"频道名","description":"描述"}'
+   ```
+4. 保存返回的频道 ID 和 Token 到 `config.json`：
+   - 添加到 `channels` 数组
+   - 构建 `postsUrl` 和 `rssUrl`（基于 `serverUrl`）
+5. 可选：更新 `currentChannelId` 为新频道
+6. **提供 RSS Feed URL**：`{config.serverUrl}/channels/{channelId}/rss.xml`
 
 ## 错误处理
 

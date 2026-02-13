@@ -1,14 +1,13 @@
 {
-  "serverUrl": "http://localhost:8765",
-  "currentChannelId": "default",
+  "serverUrl": "http://agent2rss.yaotutu.top:8765",
+  "currentChannelId": "72d5b9e9-432d-4cf9-ac8a-086f4524096b",
   "channels": [
     {
-      "id": "default",
-      "name": "默认频道",
-      "description": "AI 生成的 RSS 内容",
-      "token": "ch_82a9136f206cdb7b5e218b260c11645a",
-      "postsUrl": "http://localhost:8765/api/channels/default/posts",
-      "rssUrl": "http://localhost:8765/channels/default/rss.xml"
+      "id": "72d5b9e9-432d-4cf9-ac8a-086f4524096b",
+      "name": "AI Briefing",
+      "token": "ch_0bbcb2f21478a799d26c6414a61b1a69",
+      "postsUrl": "http://agent2rss.yaotutu.top:8765/api/channels/72d5b9e9-432d-4cf9-ac8a-086f4524096b/posts",
+      "rssUrl": "http://agent2rss.yaotutu.top:8765/channels/72d5b9e9-432d-4cf9-ac8a-086f4524096b/rss.xml"
     }
   ]
 }
