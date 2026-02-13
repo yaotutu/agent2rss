@@ -42,10 +42,3 @@ export function markdownToHtml(
   const html = md.render(markdown);
   return addInlineStyles(html, theme);
 }
-
-/**
- * 纯文本渲染（用于摘要生成）
- */
-export function markdownToText(markdown: string): string {
-  return md.render(markdown);
-}

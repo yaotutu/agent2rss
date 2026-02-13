@@ -56,3 +56,16 @@ export function generateSummary(html: string, maxLength: number = 150): string {
   }
   return cleaned.substring(0, maxLength) + '...';
 }
+
+/**
+ * 从 Markdown 内容中提取标题
+ * 提取第一个 # 标题，如果没有则返回 null
+ */
+export function extractTitleFromMarkdown(markdown: string): string | null {
+  // 移除 BOM 和空白字符
+  const trimmed = markdown.replace(/^\uFEFF/, '').trim();
+
+  // 查找第一个一级标题
+  const match = trimmed.match(/^#\s+(.+)$/m);
+  return match ? match[1].trim() : null;
+}

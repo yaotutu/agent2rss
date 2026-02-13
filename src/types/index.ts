@@ -65,9 +65,10 @@ export interface Post {
   tags?: string[];
   author?: string;
   pubDate: Date;
+  idempotencyKey?: string;       // 幂等性键，防止重复发布
 }
 
-// Webhook 请求类型
+// Webhook 请求类型（保留用于向后兼容）
 export interface WebhookRequest {
   title: string;
   link?: string;                 // 可选，不提供则自动生成内部链接
@@ -80,6 +81,42 @@ export interface WebhookRequest {
   author?: string;
 }
 
+// 统一的文章创建请求（AI 友好）
+export interface CreatePostRequest {
+  content: string;                                    // 必需，Markdown 或 HTML 内容
+  title?: string;                                     // 可选，默认从 content 提取
+  link?: string;                                      // 可选，默认自动生成
+  contentType?: 'auto' | 'markdown' | 'html';        // 默认 'auto'
+  theme?: string;                                     // 可选，覆盖频道默认主题
+  description?: string;                               // 可选，默认自动生成摘要
+  tags?: string | string[];                           // 统一支持两种类型
+  author?: string;                                    // 可选
+  idempotencyKey?: string;                            // 幂等性键，防止重复发布
+}
+
+// 错误详情
+export interface ErrorDetails {
+  reason?: string;
+  field?: string;
+  issue?: string;
+  channelId?: string;
+  provided?: string;
+  expected?: string;
+  expectedFormat?: string;
+  availableChannels?: string[];
+  help?: string;
+  docs?: string;
+  commonCauses?: string[];
+  solutions?: string[];
+}
+
+// 改进的错误响应
+export interface ErrorResponse {
+  success: false;
+  error: string;
+  details?: ErrorDetails;
+}
+
 // API 响应类型
 export interface ApiResponse {
   success?: boolean;
@@ -90,5 +127,7 @@ export interface ApiResponse {
     channel?: string;
     pubDate: Date;
   };
+  isNew?: boolean;                                    // 是否为新创建的文章（幂等性支持）
   error?: string;
+  details?: ErrorDetails;
 }

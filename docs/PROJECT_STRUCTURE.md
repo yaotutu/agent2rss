@@ -28,7 +28,6 @@ agent2rss/
 │   │   │
 │   │   └── markdown.ts              #    📝 Markdown 处理
 │   │                                #       - markdownToHtml(): 转 HTML
-│   │                                #       - markdownToText(): 转纯文本
 │   │
 │   ├── 📁 utils/                    # 🛠️ 工具函数
 │   │   └── index.ts                 #    - generateId(): 生成 UUID

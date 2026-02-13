@@ -42,8 +42,9 @@ console.log(`   http://localhost:${CONFIG.port}/channels/{channel-id}/rss.xml`);
 if (localIP) {
   console.log(`   http://${localIP}:${CONFIG.port}/channels/{channel-id}/rss.xml`);
 }
-console.log(`\n📡 Webhook endpoint:`);
-console.log(`   POST http://localhost:${CONFIG.port}/api/webhook`);
+console.log(`\n📡 创建文章 API:`);
+console.log(`   POST http://localhost:${CONFIG.port}/api/channels/{channel-id}/posts`);
+console.log(`   鉴权: Authorization: Bearer <token>`);
 console.log(`\n📚 API 文档:`);
 console.log(`   http://localhost:${CONFIG.port}/swagger`);
 console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');

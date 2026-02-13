@@ -1,5 +1,5 @@
 {
-  "serverUrl": "http://111.228.1.24:8765",
+  "serverUrl": "http://localhost:8765",
   "currentChannelId": null,
   "channels": []
 }
