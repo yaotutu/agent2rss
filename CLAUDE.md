@@ -4,9 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 项目概述
 
-Agent2RSS 是一个基于 Bun + ElysiaJS 的高性能 RSS 微服务，支持多频道管理、Markdown/HTML 内容处理、文件上传和主题系统。
+Agent2RSS 是一个基于 Bun + Hono 的高性能 RSS 微服务，支持多频道管理、Markdown/HTML 内容处理、文件上传和主题系统。
 
-**技术栈**: Bun runtime, ElysiaJS, SQLite, TypeScript, Zod
+**技术栈**: Bun runtime, Hono, @hono/zod-openapi, SQLite, TypeScript, Zod
 **API 版本**: 2.0.0
 
 ## 常用命令
@@ -72,13 +72,15 @@ curl http://localhost:8765/channels/{channel-id}/rss.xml
 **发布文章流程**:
 ```
 POST /api/channels/:channelId/posts
-  → 鉴权验证 (Authorization: Bearer token, services/auth.ts)
-  → 频道验证 (检查频道是否存在)
-  → 幂等性检查 (如果提供 idempotencyKey，检查是否已存在)
-  → 内容处理 (services/markdown.ts)
-  → 主题应用 (services/theme.ts)
-  → 数据存储 (services/storage.ts → SQLite)
-  → 返回响应 (包含 isNew 标志)
+  → extractToken 中间件 (routes/middleware.ts)
+    → 提取 Authorization: Bearer token，存入 context
+  → requireChannelAuth 中间件 (routes/middleware.ts)
+    → verifyToken() 验证 token 对目标频道是否有效
+    → readChannel() 确认频道存在，注入 channel 到 context
+  → 路由处理器 (routes/posts.ts)
+    → processPostContent() 内容处理（标题/类型/主题/摘要/标签）
+    → addPost() 幂等性检查 + 数据存储 (services/storage.ts → SQLite)
+    → 返回响应（包含 isNew 标志）
 ```
 
 **RSS Feed 生成流程**:
@@ -105,7 +107,12 @@ src/
 │   ├── markdown.ts    # Markdown 转 HTML（markdown-it）
 │   └── logger.ts      # 日志服务（pino）
 ├── routes/
-│   └── index.ts       # 所有 HTTP 路由定义
+│   ├── index.ts       # 路由入口，组装所有子路由 + 全局中间件
+│   ├── middleware.ts  # 中间件：extractToken、requireChannelAuth
+│   ├── helpers.ts     # 工具函数：processPostContent（内容处理）
+│   ├── posts.ts       # 文章路由（JSON 发布 + 文件上传）
+│   ├── channels.ts    # 频道管理路由（CRUD）
+│   └── system.ts      # 系统路由（health、根路径、RSS、Swagger）
 ├── types/
 │   └── index.ts       # TypeScript 类型定义
 ├── utils/
@@ -148,9 +155,16 @@ src/
 - 支持: 表格、代码高亮、Emoji、脚注、上下标、标记、缩写等
 - `markdownToHtml()`: Markdown → HTML + 主题样式
 
-#### 6. 路由层 (routes/index.ts)
-- **Swagger 文档**: 自动生成 API 文档（`@elysiajs/swagger`）
-- **类型验证**: 使用 Elysia 的 `t` schema 进行请求/响应验证
+#### 6. 路由层 (routes/)
+- **框架**: Hono + @hono/zod-openapi，自动生成 Swagger 文档
+- **模块拆分**:
+  - `index.ts`: 入口，注册全局中间件和错误处理，组装子路由
+  - `middleware.ts`: `extractToken`（提取 Bearer token）、`requireChannelAuth`（鉴权 + 频道存在性验证，注入 channel 到 context）
+  - `helpers.ts`: `processPostContent`（统一处理标题提取、内容类型检测、主题应用、摘要生成、标签解析）
+  - `posts.ts`: 文章路由，两个端点均通过中间件链保护
+  - `channels.ts`: 频道 CRUD 路由
+  - `system.ts`: 健康检查、根路径、RSS Feed、Swagger
+- **类型验证**: 使用 Zod schema 进行请求/响应验证
 - **错误处理**: 全局 `onError` 处理器，统一错误响应格式
 
 ### 环境变量配置
@@ -298,9 +312,14 @@ curl -X POST "http://localhost:8765/api/channels/default/posts" \
 - **双层鉴权**:
   - 超级管理员 Token (`AUTH_TOKEN` 环境变量) - 全局权限
   - 频道 Token (创建频道时生成，格式 `ch_xxx`) - 频道级权限
+- **中间件链**（文章路由）:
+  - `extractToken`：提取 token，无 token 直接返回 401
+  - `requireChannelAuth`：验证 token + 确认频道存在，通过后将 channel 注入 context
+  - 路由处理器通过 `c.get('channel')` 直接使用，无需重复查询数据库
 - 私有模式 (`CHANNEL_CREATION_MODE=private`) 下，创建频道需要超级管理员 Token
 - 更新/删除频道需要频道 Token 或超级管理员 Token
 - 发布文章需要频道 Token 或超级管理员 Token
+- GET 接口无需鉴权，但携带有效 token 时会额外返回 token 字段
 
 ### 主题开发
 - 主题配置在 `themes.json` 中定义
@@ -318,7 +337,7 @@ curl -X POST "http://localhost:8765/api/channels/default/posts" \
 - **幂等性**: 提供 `idempotencyKey` 时，相同频道内相同键的请求只会创建一次文章
 
 ### 错误处理
-- 使用 Elysia 的全局错误处理器统一响应格式
+- 使用 Hono 的全局错误处理器统一响应格式（`src/routes/index.ts`）
 - 验证错误返回 422，未授权返回 401，禁止访问返回 403
 - 数据库错误会被捕获并返回 500
 - **JSON 解析错误** (400): 提供详细的错误诊断和解决方案
@@ -363,10 +382,17 @@ curl -X POST "http://localhost:8765/api/channels/default/posts/upload" \
 ```
 
 ### 添加新的 API 端点
-1. 在 `src/routes/index.ts` 中添加路由
-2. 使用 Elysia 的 `t` schema 定义请求/响应类型
-3. 在 `detail` 中添加 Swagger 文档信息
-4. 如需数据库操作，调用 `services/storage.ts` 中的函数
+1. 根据端点类型，在对应的路由文件中添加路由：
+   - 文章相关 → `src/routes/posts.ts`
+   - 频道相关 → `src/routes/channels.ts`
+   - 系统相关 → `src/routes/system.ts`
+2. 使用 `createRoute` + `app.openapi` 定义路由（自动生成 Swagger 文档）
+3. 使用 Zod schema 定义请求/响应类型
+4. 需要鉴权的端点，在路由注册前添加中间件：
+   ```ts
+   app.use('/api/channels/:channelId/xxx', extractToken, requireChannelAuth);
+   ```
+5. 如需数据库操作，调用 `services/storage.ts` 中的函数
 
 ### 添加新的主题
 1. 在 `themes.json` 中添加主题配置
