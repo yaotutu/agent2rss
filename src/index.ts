@@ -18,17 +18,9 @@ logger.info('主题加载完成');
 // 创建路由
 const app = createRoutes();
 
-// 添加日志装饰器
-app.decorate('logger', logger);
-
-// 添加请求日志中间件
-app.onRequest(({ request }) => {
-  logger.info({ method: request.method, url: request.url }, '收到请求');
-});
-
 // ============== 启动服务 ==============
 
-app.listen(CONFIG.port);
+Bun.serve({ fetch: app.fetch, port: CONFIG.port });
 
 // ============== 输出服务信息 ==============
 
