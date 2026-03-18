@@ -2,6 +2,8 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+**最后更新**: 2026-03-18
+
 ## 项目概述
 
 Agent2RSS 是一个基于 Bun + ElysiaJS 的高性能 RSS 微服务，支持多频道管理、Markdown/HTML 内容处理、文件上传和主题系统。
@@ -22,6 +24,21 @@ bun run start
 # 安装依赖
 bun install
 ```
+
+### AI Agent 快速参考
+
+发布文章到 RSS（最简方式）:
+```bash
+curl -X POST "http://localhost:8765/api/channels/{channel-id}/posts" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer {token}" \
+  -d '{"content":"# 标题\n\n正文内容","idempotencyKey":"unique-key"}'
+```
+
+关键参数:
+- `content` (必填): Markdown 或 HTML 内容
+- `idempotencyKey` (推荐): 幂等性键，防止重复发布
+- `title` (可选): 不提供则自动从 `# 标题` 提取
 
 ### 数据库
 - 数据库文件位置: `data/agent2rss.db`
@@ -156,14 +173,17 @@ src/
 ### 环境变量配置
 
 必需变量（在 `src/config/env.ts` 中验证）:
-- `PORT`: 服务端口（默认 8765）
-- `AUTH_TOKEN`: 超级管理员 Token（必填）
-- `FEED_URL`: RSS Feed 基础 URL（必填，如 `http://192.168.1.100:8765`）
-- `LOG_LEVEL`: 日志级别（debug/info/warn/error，默认 info）
-- `NODE_ENV`: 环境（development/production，默认 development）
-- `CHANNEL_CREATION_MODE`: 频道创建模式（public/private，默认 public）
 
-**重要**: 启动时会自动验证环境变量，失败则退出进程。
+| 变量名 | 必填 | 默认值 | 说明 |
+|--------|------|--------|------|
+| `AUTH_TOKEN` | ✅ | - | 超级管理员 Token，用于全局管理 |
+| `FEED_URL` | ✅ | - | RSS Feed 基础 URL（如 `http://192.168.1.100:8765`） |
+| `PORT` | ❌ | 8765 | 服务端口 |
+| `LOG_LEVEL` | ❌ | info | 日志级别（debug/info/warn/error） |
+| `NODE_ENV` | ❌ | development | 运行环境（development/production） |
+| `CHANNEL_CREATION_MODE` | ❌ | public | 频道创建模式（public/private） |
+
+**重要**: 启动时会自动验证环境变量，`AUTH_TOKEN` 和 `FEED_URL` 缺失会导致进程退出。
 
 ## API 接口规范
 
@@ -171,14 +191,16 @@ src/
 
 | 方法 | 端点 | 鉴权 | 说明 |
 |------|------|------|------|
-| POST | `/api/channels/:channelId/posts` | ✅ | 创建文章（AI 友好，title 可选） |
+| POST | `/api/channels/:channelId/posts` | ✅ | 创建文章（AI 友好，title 可选，支持幂等性） |
 | POST | `/api/channels/:channelId/posts/upload` | ✅ | 上传 Markdown 文件创建文章 |
 | GET | `/channels/:id/rss.xml` | ❌ | 获取频道 RSS Feed |
 | GET | `/api/channels` | ❌ | 获取所有频道列表 |
 | GET | `/api/channels/:id` | ❌ | 获取单个频道详情 |
 | POST | `/api/channels` | ⚠️ | 创建频道（私有模式需超级管理员 Token） |
 | PUT | `/api/channels/:id` | ✅ | 更新频道配置 |
-| DELETE | `/api/channels/:id` | ✅ | 删除频道 |
+| DELETE | `/api/channels/:id` | ✅ | 删除频道（默认频道不可删除） |
+| GET | `/health` | ❌ | 健康检查 |
+| GET | `/swagger` | ❌ | API 文档 |
 
 ### 认证方式
 
@@ -409,11 +431,17 @@ sudo systemctl start agent2rss
 
 ## 文档资源
 
-- **文档资源**: `docs/ARCHITECTURE.md` - 模块化架构详解
-- **多频道指南**: `docs/MULTI_CHANNEL.md` - 多频道使用完整指南
-- **API 参考**: `docs/API.md` - API 接口详细说明
-- **文件上传**: `docs/FILE_UPLOAD.md` - Markdown 文件上传功能说明
-- **项目结构**: `docs/PROJECT_STRUCTURE.md` - 目录结构和模块关系
-- **AI 快速开始**: `docs/AI_QUICK_START.md` - AI Agent 集成指南
-- **故障排除**: `docs/TROUBLESHOOTING.md` - 常见问题解决方案
-- **AI 内容链接**: `docs/AI_CONTENT_LINKS.md` - AI 生成内容的链接处理方案
+| 文档 | 说明 |
+|------|------|
+| `docs/ARCHITECTURE.md` | 模块化架构详解 |
+| `docs/MULTI_CHANNEL.md` | 多频道使用完整指南 |
+| `docs/API.md` | API 接口详细说明 |
+| `docs/FILE_UPLOAD.md` | Markdown 文件上传功能说明 |
+| `docs/PROJECT_STRUCTURE.md` | 目录结构和模块关系 |
+| `docs/AI_QUICK_START.md` | AI Agent 集成指南 |
+| `docs/TROUBLESHOOTING.md` | 常见问题解决方案 |
+| `docs/AI_CONTENT_LINKS.md` | AI 生成内容的链接处理方案 |
+
+## 版本历史
+
+- **2.0.0**: 当前版本，支持多频道、幂等性、文件上传、主题系统
