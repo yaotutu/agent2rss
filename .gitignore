@@ -38,3 +38,6 @@ tests/*.log
 tmp/
 temp/
 *.tmp
+
+.agents/*
+skills-lock.json
