@@ -1,6 +1,6 @@
 ---
-name: agent2rss-client
-description: Agent2RSS 客户端，管理 RSS 频道并推送内容。触发：用户提到 Agent2RSS/RSS 频道/推送文章/上传文章/创建频道/设置默认频道/幂等性。
+name: agent2rss
+description: 管理 RSS 频道并推送内容。触发词：Agent2RSS、RSS频道、推送文章、上传文章、创建频道、设置默认频道、幂等性。
 metadata: { "nanobot": { "emoji": "📡", "requires": { "bins": ["bash", "curl", "jq"] } }, "openclaw": { "emoji": "📡", "requires": { "bins": ["bash", "curl", "jq"] } } }
 ---
 
