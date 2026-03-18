@@ -1,11 +1,15 @@
 # Agent2RSS
 
-一个基于 Bun + ElysiaJS 的高性能 RSS 微服务，支持 Markdown 和 HTML 内容，提供丰富的主题系统和**多频道支持**。
+将 AI 生成的内容推送到 RSS Feed。
+
+[![Install Skill](https://img.shields.io/badge/Install-npx%20skills%20add%20yaotutu%2Fagent2rss-blue)](https://skills.sh/)
+
+一个基于 Bun + Hono 的高性能 RSS 微服务，支持 Markdown 和 HTML 内容，提供丰富的主题系统和**多频道支持**。
 
 ## ✨ 功能特性
 
-- ⚡ **高性能**: 基于 Bun 运行时和 ElysiaJS 框架
-- 🔒 **安全鉴权**: 使用 Token 验证 Webhook 请求
+- ⚡ **高性能**: 基于 Bun 运行时和 Hono 框架
+- 🔒 **安全鉴权**: 使用 Token 验证 API 请求
 - 🎯 **多频道支持**: 创建多个独立的 RSS Feed，每个频道独立配置
 - 📝 **双模式支持**: Markdown 自动美化 / HTML 完全自定义
 - 🎨 **精选主题**: 6 个内置主题，完美兼容 RSS 阅读器
@@ -34,25 +38,42 @@
 
 ## 🚀 快速开始
 
-### 1. 安装依赖
+### 作为 AI Agent Skill 使用
+
+将 Agent2RSS 集成到你的 AI Agent（支持 Claude Code、OpenClaw、Cursor 等）：
 
 ```bash
+# 安装 skill
+npx skills add yaotutu/agent2rss
+
+# 或手动安装到你的 agent
+git clone https://github.com/yaotutu/agent2rss.git
+cp -r agent2rss/skill ~/.nanobot/workspace/skills/agent2rss
+```
+
+**使用方式**：
+- **托管服务**（推荐）：直接使用 `https://agent2rss.yaotutu.top:8765`，无需部署
+- **自建服务**：部署本项目到自己的服务器
+
+### 自建服务端部署
+
+如果你想自己部署服务端：
+
+```bash
+# 1. 安装依赖
 bun install
-```
 
-### 2. 配置环境变量
-
-```bash
+# 2. 配置环境变量
 cp .env.example .env
-```
+# 编辑 .env 设置 AUTH_TOKEN 等
 
-### 3. 启动服务
-
-```bash
+# 3. 启动服务
 bun run start
 ```
 
 ## 📡 API 文档
+
+启动服务后访问 `http://localhost:8765/doc` 查看交互式 API 文档 (Scalar UI)。
 
 ### 发布文章 API
 
@@ -86,9 +107,15 @@ Authorization: Bearer {channel-token}
   "theme": "github",                       // 可选，覆盖频道默认主题
   "description": "文章摘要",               // 可选，默认自动生成
   "tags": ["标签1", "标签2"],              // 可选，支持数组或逗号分隔字符串
-  "author": "作者名"                       // 可选
+  "author": "作者名",                      // 可选
+  "idempotencyKey": "unique-key-001"       // 可选，幂等性键，防止重复发布
 }
 ```
+
+**幂等性说明**：
+- 提供 `idempotencyKey` 时，相同频道内相同 key 的请求只会创建一次文章
+- 返回的 `isNew` 字段：`true` 表示新创建，`false` 表示已存在
+- 适合 AI Agent 重试场景，避免重复发布
 
 #### POST `/api/channels/:channelId/posts/upload`
 
@@ -130,9 +157,10 @@ curl -X POST "http://localhost:8765/api/channels/{channel-id}/posts/upload" \
 POST /api/channels
 ```
 
+> **注意**: 频道 ID 由服务端自动生成，确保唯一性。
+
 ```json
 {
-  "id": "tech",              // 必填，频道唯一标识
   "name": "科技频道",         // 必填，显示名称
   "description": "最新科技资讯", // 必填，RSS 描述
   "theme": "github",         // 可选，主题
@@ -160,34 +188,6 @@ PUT /api/channels/:id
 ```bash
 DELETE /api/channels/:id
 ```
-
-### POST /api/webhook
-
-**重要变更**: `channel` 参数现在是**必填**的！
-
-**请求参数**：
-
-```json
-{
-  "title": "文章标题",              // 必填
-  "link": "https://example.com",   // 可选，不提供则自动生成
-  "content": "内容",               // 必填
-  "channel": "tech",               // 必填，目标频道 ID
-  "contentType": "markdown",       // 可选: "markdown" | "html"
-  "theme": "github",               // 可选，覆盖频道默认主题
-  "description": "自定义摘要",     // 可选
-  "tags": ["标签1", "标签2"],     // 可选
-  "author": "作者名"              // 可选
-}
-```
-
-**重要说明**：
-- `link` 参数现在是**可选**的
-- 如果不提供，系统会自动生成内部永久链接
-- 特别适合 AI 生成的内容（通常没有外部链接）
-- 详见：[AI 内容链接处理方案](docs/AI_CONTENT_LINKS.md)
-
-**鉴权**：Header 中需要 `Authorization: Bearer <token>` (频道 token 或超级管理员 token)
 
 ### GET /channels/:id/rss.xml
 
@@ -315,7 +315,7 @@ curl http://localhost:8765/api/channels
 curl -X POST http://localhost:8765/api/channels/{channel-id}/posts \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer {channel-token}" \
-  -d '{"title": "新闻", "content": "新闻内容...", "channel": "news"}'
+  -d '{"title": "新闻", "content": "新闻内容..."}'
 
 # 发布到不同频道（文件上传方式）
 curl -X POST "http://localhost:8765/api/channels/{channel-id}/posts/upload" \
@@ -327,10 +327,7 @@ curl -X POST "http://localhost:8765/api/channels/{channel-id}/posts/upload" \
 
 ```bash
 # 订阅特定频道
-curl http://localhost:8765/channels/tech/rss.xml
-
-# 订阅聚合频道（所有文章）
-curl http://localhost:8765/rss.xml
+curl http://localhost:8765/channels/{channel-id}/rss.xml
 ```
 
 ## 🔧 项目结构
@@ -342,10 +339,14 @@ agent2rss/
 │   ├── types/                # 类型定义
 │   ├── services/             # 业务服务
 │   ├── utils/                # 工具函数
-│   ├── routes/               # 路由处理
-│   └── index.ts              # 主应用
+│   ├── middleware/           # 中间件（鉴权、错误处理）
+│   ├── routes/
+│   │   ├── schemas/          # Zod Schema 定义
+│   │   ├── routes/           # 模块化路由
+│   │   └── index.ts          # OpenAPIHono 聚合器
+│   └── index.ts              # 主应用入口
 ├── data/
-│   └── posts.json            # 数据存储
+│   └── agent2rss.db          # SQLite 数据存储
 ├── docs/                     # 📚 详细文档
 │   ├── ARCHITECTURE.md       # 架构说明
 │   └── PROJECT_STRUCTURE.md  # 项目结构详解
