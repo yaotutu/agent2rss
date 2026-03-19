@@ -1,6 +1,7 @@
 import { createRoute, OpenAPIHono } from '@hono/zod-openapi';
 import { z } from '@hono/zod-openapi';
 import { Feed } from 'feed';
+import { createHash } from 'crypto';
 import { readChannel, readPosts } from '../../services/storage.js';
 import { CONFIG } from '../../config/index.js';
 import { IdParamSchema, NotFoundResponse } from '../schemas/index.js';
@@ -84,11 +85,37 @@ export function registerFeedRoutes(app: OpenAPIHono) {
       });
     }
 
-    // 设置 Content-Type 和缓存控制头
+    // 生成 RSS 内容
+    const rssContent = feed.rss2();
+
+    // 生成 ETag（基于内容哈希）
+    const etag = `"${createHash('md5').update(rssContent).digest('hex')}"`;
+
+    // 获取最后更新时间
+    const lastModified = posts.length > 0 ? posts[0].pubDate : new Date();
+
+    // 检查 If-None-Match（客户端缓存验证）
+    const ifNoneMatch = c.req.header('If-None-Match');
+    if (ifNoneMatch === etag) {
+      return c.body(null, 304); // 内容未修改
+    }
+
+    // 检查 If-Modified-Since
+    const ifModifiedSince = c.req.header('If-Modified-Since');
+    if (ifModifiedSince) {
+      const clientDate = new Date(ifModifiedSince);
+      if (clientDate >= lastModified) {
+        return c.body(null, 304); // 内容未修改
+      }
+    }
+
+    // 设置响应头
     c.header('Content-Type', 'application/xml; charset=utf-8');
+    c.header('ETag', etag);
+    c.header('Last-Modified', lastModified.toUTCString());
     c.header('Cache-Control', 'no-cache, no-store, must-revalidate');
     c.header('Pragma', 'no-cache');
     c.header('Expires', '0');
-    return c.text(feed.rss2());
+    return c.text(rssContent);
   });
 }
