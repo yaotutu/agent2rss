@@ -120,13 +120,15 @@ src/
 │   ├── database.ts    # SQLite 数据库管理（单例模式）
 │   ├── storage.ts     # 数据 CRUD 操作
 │   ├── auth.ts        # Token 鉴权逻辑
-│   ├── theme.ts       # 主题加载和样式注入
+│   ├── theme.ts       # 主题加载和 CSS 内联（使用 juice 库）
 │   ├── markdown.ts    # Markdown 转 HTML（markdown-it）
 │   └── logger.ts      # 日志服务（pino）
 ├── routes/
 │   ├── index.ts       # 路由注册和应用配置
 │   ├── schemas/       # Zod schema 定义（含输入长度限制）
 │   └── routes/        # 路由处理函数
+├── styles/
+│   └── base.css       # 基础 CSS 样式（移动端友好，通过 juice 内联）
 ├── types/
 │   └── index.ts       # TypeScript 类型定义（Channel, Post, DBPost, DBChannel 等数据库行类型）
 ├── utils/
@@ -163,11 +165,11 @@ src/
 - **安全增强**: 使用时序安全比较（timing-safe equal）防止时序攻击
 - **中间件辅助函数**: `checkChannelAuth()`, `isSuperAdmin()`, `extractBearerToken()` 统一鉴权逻辑
 
-#### 4. 主题系统 (services/theme.ts)
-- 主题配置文件: `themes.json`（根目录）
-- 内置主题: github, minimal, dark, modern, elegant, clean, spring
-- `addInlineStyles()`: 将主题样式注入 HTML 元素的 style 属性（兼容 RSS 阅读器）
-- **性能优化**: 使用单次正则遍历替代多次替换
+#### 4. 主题系统 (services/theme.ts + styles/base.css)
+- CSS 文件: `src/styles/base.css`（移动端友好的响应式样式）
+- 使用 `juice` 库自动内联 CSS（兼容 RSS 阅读器）
+- 关键样式: `overflow-wrap: anywhere`, `word-break: break-word`, `white-space: pre-wrap`
+- 解决移动端长 URL/代码块横向滚动问题
 
 #### 5. Markdown 处理 (services/markdown.ts)
 - 使用 `markdown-it` 及 10+ 扩展插件
@@ -335,9 +337,14 @@ curl -X POST "http://localhost:8765/api/channels/default/posts" \
 - 发布文章需要频道 Token 或超级管理员 Token
 
 ### 主题开发
-- 主题配置在 `themes.json` 中定义
-- 样式必须使用内联 CSS（RSS 阅读器不支持 `<style>` 标签）
-- 添加新主题后需要重启服务（主题在启动时加载）
+- CSS 样式定义在 `src/styles/base.css` 中
+- 使用 `juice` 库自动内联 CSS（RSS 阅读器不支持 `<style>` 标签）
+- 修改 CSS 后需要重启服务
+- 关键样式说明：
+  - `overflow-wrap: anywhere` - 允许在任意位置换行
+  - `word-break: break-word` - 单词内换行
+  - `white-space: pre-wrap` - 代码块自动换行
+  - `box-sizing: border-box` - 统一盒模型
 
 ### 内容处理
 - **必填字段**: `content`（文章内容，支持 Markdown 和 HTML，最大 1MB）
@@ -456,5 +463,6 @@ sudo systemctl start agent2rss
 
 ## 版本历史
 
+- **2.0.2**: 使用 juice 库替代手写样式内联，修复移动端溢出问题
 - **2.0.1**: 架构优化 - 统一鉴权中间件、修复 N+1 查询、添加时序安全比较、输入长度限制、类型安全增强
-- **2.0.0**: 当前版本，支持多频道、幂等性、文件上传、主题系统
+- **2.0.0**: 支持多频道、幂等性、文件上传、主题系统
