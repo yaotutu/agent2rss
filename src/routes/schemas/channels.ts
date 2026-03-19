@@ -61,6 +61,10 @@ export const ChannelInfoSchema = z.object({
     example: 'ch_4fd9cdce724ffb8d6ec69187b5438ae2',
   }),
   postCount: z.number().openapi({ example: 42 }),
+  rssUrl: z.string().openapi({
+    description: 'RSS Feed 订阅地址',
+    example: 'https://your-domain.com/channels/8cf83b0d-f856-4f7c-bd1c-4f6ca0338ece/rss.xml',
+  }),
   createdAt: z.string().openapi({ description: 'ISO 8601 日期时间' }),
   updatedAt: z.string().openapi({ description: 'ISO 8601 日期时间' }),
 });

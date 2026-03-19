@@ -226,6 +226,7 @@ export function registerChannelRoutes(app: OpenAPIHono) {
         maxPosts: channel.maxPosts,
         token: isSuperAdminFlag ? channel.token : undefined,
         postCount: posts.length,
+        rssUrl: `${CONFIG.feed.url}/channels/${id}/rss.xml`,
         createdAt: channel.createdAt.toISOString(),
         updatedAt: channel.updatedAt.toISOString(),
       });
@@ -260,6 +261,7 @@ export function registerChannelRoutes(app: OpenAPIHono) {
       maxPosts: channel.maxPosts,
       token: authResult.authorized ? channel.token : undefined,
       postCount: posts.length,
+      rssUrl: `${CONFIG.feed.url}/channels/${id}/rss.xml`,
       createdAt: channel.createdAt.toISOString(),
       updatedAt: channel.updatedAt.toISOString(),
     }, 200);
