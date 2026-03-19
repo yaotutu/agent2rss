@@ -1,38 +1,53 @@
-// 主题相关类型
-export interface ThemeStyles {
-  pre?: string;
-  codeInline?: string;
-  table?: string;
-  thead?: string;
-  th?: string;
-  td?: string;
-  tr?: string;
-  blockquote?: string;
-  h1?: string;
-  h2?: string;
-  h3?: string;
-  h4?: string;
-  h5?: string;
-  h6?: string;
-  p?: string;
-  ul?: string;
-  ol?: string;
-  li?: string;
-  a?: string;
-  hr?: string;
-  mark?: string;
-  ins?: string;
-  del?: string;
-  img?: string;
-}
-
+// 主题相关类型（简化版，使用 CSS 文件）
 export interface Theme {
   name: string;
   description: string;
-  styles: ThemeStyles;
+  cssFile?: string;
 }
 
 export type Themes = Record<string, Theme>;
+
+// ============== 数据库行类型 ==============
+
+/** 数据库中的频道行 */
+export interface DBChannel {
+  id: string;
+  name: string;
+  description: string;
+  theme: string | null;
+  language: string | null;
+  max_posts: number;
+  token: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/** 数据库中的文章行 */
+export interface DBPost {
+  id: string;
+  title: string;
+  link: string;
+  content: string;
+  content_markdown: string | null;
+  summary: string;
+  author: string | null;
+  pub_date: string;
+  channel_id: string;
+  idempotency_key: string | null;
+}
+
+/** 数据库中的标签行 */
+export interface DBPostTag {
+  post_id: string;
+  tag: string;
+}
+
+/** 数据库中的频道配置行 */
+export interface DBChannelConfig {
+  id: string;
+}
+
+// ============== 应用层类型 ==============
 
 // 存储数据类型
 export interface StorageData {
@@ -46,7 +61,6 @@ export interface Channel {
   name: string;                  // 显示名称
   description: string;           // RSS 描述
   theme?: string;                // 主题 (默认使用全局配置)
-  maxPosts?: number;             // 最大文章数 (默认使用全局配置)
   language?: string;             // 语言 (默认: zh-CN)
   token: string;                 // 频道密钥 (用于鉴权)
   createdAt: Date;
@@ -60,7 +74,7 @@ export interface Post {
   title: string;
   link: string;
   content: string;
-  contentMarkdown: string;
+  contentMarkdown?: string;
   summary: string;
   tags?: string[];
   author?: string;

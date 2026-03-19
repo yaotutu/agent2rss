@@ -1,0 +1,88 @@
+/**
+ * GitHub Theme
+ * GitHub official style, suitable for technical documentation
+ */
+
+body {
+  color: #24292f;
+}
+
+a {
+  color: #0969da;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+/* Headings */
+h1, h2, h3, h4, h5 {
+  color: #1f2328;
+}
+
+h6 {
+  color: #57606a;
+}
+
+h1, h2 {
+  border-bottom: 1px solid #d0d7de;
+  padding-bottom: 8px;
+}
+
+/* Inline code */
+code {
+  background: #f6f8fa;
+  color: #e83e8c;
+}
+
+/* Code blocks */
+pre {
+  background: #f6f8fa;
+  border: 1px solid #d0d7de;
+}
+
+pre code {
+  color: #24292f;
+}
+
+/* Tables */
+table {
+  border: 1px solid #d0d7de;
+}
+
+thead {
+  background: #f6f8fa;
+}
+
+th, td {
+  border: 1px solid #d0d7de;
+}
+
+/* Blockquote */
+blockquote {
+  border-left-color: #0969da;
+  color: #57606a;
+  background: #f6f8fa;
+  border-radius: 0 6px 6px 0;
+}
+
+/* Horizontal rule */
+hr {
+  border-top-color: #d0d7de;
+}
+
+/* Mark */
+mark {
+  background: #fff8c5;
+}
+
+/* Inserted text */
+ins {
+  background: #d4f8d4;
+}
+
+/* Deleted text */
+del {
+  color: #82071e;
+  background: #ffebe9;
+}

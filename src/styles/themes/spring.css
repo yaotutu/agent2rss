@@ -1,0 +1,81 @@
+/**
+ * Spring Theme
+ * Fresh and vibrant green tones
+ */
+
+body {
+  color: #2d5016;
+}
+
+a {
+  color: #15803d;
+}
+
+a:hover {
+  color: #166534;
+  text-decoration: underline;
+}
+
+/* Headings */
+h1, h2, h3, h4, h5, h6 {
+  color: #14532d;
+}
+
+/* Inline code */
+code {
+  background: #dcfce7;
+  color: #166534;
+}
+
+/* Code blocks */
+pre {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+}
+
+pre code {
+  color: #14532d;
+}
+
+/* Tables */
+table {
+  border: 1px solid #bbf7d0;
+}
+
+thead {
+  background: #dcfce7;
+}
+
+th, td {
+  border: 1px solid #bbf7d0;
+}
+
+/* Blockquote */
+blockquote {
+  border-left-color: #22c55e;
+  color: #166534;
+  background: #f0fdf4;
+  border-radius: 0 8px 8px 0;
+}
+
+/* Horizontal rule */
+hr {
+  border-top-color: #bbf7d0;
+}
+
+/* Mark */
+mark {
+  background: #fef9c3;
+}
+
+/* Inserted text */
+ins {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+/* Deleted text */
+del {
+  color: #991b1b;
+  background: #fee2e2;
+}

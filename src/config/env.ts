@@ -4,7 +4,7 @@ import { z } from 'zod';
  * 环境变量 Schema 定义
  */
 const envSchema = z.object({
-  PORT: z.string().regex(/^\d+$/).transform(Number).default('8765'),
+  PORT: z.coerce.number().default(8765),
   AUTH_TOKEN: z.string().min(1, 'AUTH_TOKEN 不能为空'),
   FEED_URL: z.string().url('FEED_URL 必须是有效的 URL'),
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
@@ -25,14 +25,15 @@ export function validateEnv(): Env {
     return envSchema.parse(process.env);
   } catch (error) {
     console.error('❌ 环境变量验证失败:');
-    console.error('错误类型:', typeof error, error?.constructor?.name);
-    console.error('完整错误:', error);
 
-    if (error && typeof error === 'object' && 'errors' in error) {
-      const zodError = error as z.ZodError;
-      zodError.errors.forEach((err) => {
+    if (error instanceof z.ZodError) {
+      // @ts-ignore - Zod 4 uses 'issues' instead of 'errors'
+      const issues = error.issues || error.errors || [];
+      issues.forEach((err: any) => {
         console.error(`  - ${err.path.join('.')}: ${err.message}`);
       });
+    } else {
+      console.error(error);
     }
     console.error('\n请检查 .env 文件配置');
     process.exit(1);

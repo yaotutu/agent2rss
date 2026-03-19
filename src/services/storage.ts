@@ -1,39 +1,58 @@
 import { getDatabase } from './database.js';
-import type { Post, Channel } from '../types/index.js';
+import type { Post, Channel, DBChannel } from '../types/index.js';
 import { CONFIG } from '../config/index.js';
 
+/** 带别名的文章查询结果 */
+interface PostQueryResult {
+  id: string;
+  title: string;
+  link: string;
+  content: string;
+  contentMarkdown: string | null;
+  summary: string;
+  author: string | null;
+  pubDate: string;
+  channel: string;
+  tags: string | null;
+}
+
 /**
- * 按频道读取文章
+ * 按频道读取文章（优化版：使用 LEFT JOIN 避免 N+1 查询）
  */
 export async function readPosts(channel: string): Promise<Post[]> {
   const db = getDatabase();
 
+  // 使用 LEFT JOIN 一次性获取文章和标签
   const query = db.query(`
     SELECT
       p.id, p.title, p.link, p.content, p.content_markdown as contentMarkdown,
-      p.summary, p.author, p.pub_date as pubDate, p.channel_id as channel
+      p.summary, p.author, p.pub_date as pubDate, p.channel_id as channel,
+      GROUP_CONCAT(pt.tag, ',') as tags
     FROM posts p
+    LEFT JOIN post_tags pt ON p.id = pt.post_id
     WHERE p.channel_id = ?
+    GROUP BY p.id
     ORDER BY p.pub_date DESC
   `);
 
-  const rows = query.all(channel) as any[];
+  const rows = query.all(channel) as PostQueryResult[];
 
-  // 为每篇文章加载标签
-  const posts = rows.map(row => {
-    const tags = getPostTags(row.id);
-    return {
-      ...row,
-      pubDate: new Date(row.pubDate),
-      tags: tags.length > 0 ? tags : undefined,
-    };
-  });
-
-  return posts;
+  return rows.map(row => ({
+    id: row.id,
+    title: row.title,
+    link: row.link,
+    content: row.content,
+    contentMarkdown: row.contentMarkdown ?? undefined,
+    summary: row.summary,
+    author: row.author ?? undefined,
+    pubDate: new Date(row.pubDate),
+    channel: row.channel,
+    tags: row.tags ? row.tags.split(',').filter(Boolean) : undefined,
+  }));
 }
 
 /**
- * 读取所有文章
+ * 读取所有文章（优化版：使用 LEFT JOIN 避免 N+1 查询）
  */
 export async function readAllPosts(): Promise<Post[]> {
   const db = getDatabase();
@@ -41,34 +60,28 @@ export async function readAllPosts(): Promise<Post[]> {
   const query = db.query(`
     SELECT
       p.id, p.title, p.link, p.content, p.content_markdown as contentMarkdown,
-      p.summary, p.author, p.pub_date as pubDate, p.channel_id as channel
+      p.summary, p.author, p.pub_date as pubDate, p.channel_id as channel,
+      GROUP_CONCAT(pt.tag, ',') as tags
     FROM posts p
+    LEFT JOIN post_tags pt ON p.id = pt.post_id
+    GROUP BY p.id
     ORDER BY p.pub_date DESC
   `);
 
-  const rows = query.all() as any[];
+  const rows = query.all() as PostQueryResult[];
 
-  // 为每篇文章加载标签
-  const posts = rows.map(row => {
-    const tags = getPostTags(row.id);
-    return {
-      ...row,
-      pubDate: new Date(row.pubDate),
-      tags: tags.length > 0 ? tags : undefined,
-    };
-  });
-
-  return posts;
-}
-
-/**
- * 获取文章的标签
- */
-function getPostTags(postId: string): string[] {
-  const db = getDatabase();
-  const query = db.query('SELECT tag FROM post_tags WHERE post_id = ?');
-  const rows = query.all(postId) as any[];
-  return rows.map(row => row.tag);
+  return rows.map(row => ({
+    id: row.id,
+    title: row.title,
+    link: row.link,
+    content: row.content,
+    contentMarkdown: row.contentMarkdown ?? undefined,
+    summary: row.summary,
+    author: row.author ?? undefined,
+    pubDate: new Date(row.pubDate),
+    channel: row.channel,
+    tags: row.tags ? row.tags.split(',').filter(Boolean) : undefined,
+  }));
 }
 
 /**
@@ -79,23 +92,22 @@ export async function addPost(post: Post, channel: string): Promise<{ id: string
   const db = getDatabase();
 
   // 检查频道是否存在
-  const channelQuery = db.query('SELECT id, max_posts FROM channels WHERE id = ?');
-  const channelConfig = channelQuery.get(channel) as any;
+  const channelQuery = db.query<{ id: string }, [string]>('SELECT id FROM channels WHERE id = ?');
+  const channelExists = channelQuery.get(channel);
 
-  if (!channelConfig) {
+  if (!channelExists) {
     throw new Error(`Channel "${channel}" not found`);
   }
 
   // 幂等性检查：如果提供了 idempotencyKey，检查是否已存在
   if (post.idempotencyKey) {
-    const existingQuery = db.query(`
+    const existingQuery = db.query<{ id: string }, [string, string]>(`
       SELECT id FROM posts
       WHERE channel_id = ? AND idempotency_key = ?
     `);
-    const existing = existingQuery.get(channel, post.idempotencyKey) as any;
+    const existing = existingQuery.get(channel, post.idempotencyKey);
 
     if (existing) {
-      // 已存在相同 idempotencyKey 的文章，返回现有文章 ID
       return { id: existing.id, isNew: false };
     }
   }
@@ -115,7 +127,7 @@ export async function addPost(post: Post, channel: string): Promise<{ id: string
       post.title,
       post.link,
       post.content,
-      post.contentMarkdown,
+      post.contentMarkdown || null,
       post.summary,
       post.author || null,
       post.pubDate.toISOString(),
@@ -131,20 +143,20 @@ export async function addPost(post: Post, channel: string): Promise<{ id: string
       }
     }
 
-    // 检查该频道的文章数量，删除超过限制的旧文章
-    const maxPosts = channelConfig.max_posts || CONFIG.storage.maxPosts;
-    const countQuery = db.query('SELECT COUNT(*) as count FROM posts WHERE channel_id = ?');
-    const countResult = countQuery.get(channel) as any;
+    // 检查该频道的文章数量，删除超过限制的旧文章（全局固定 100）
+    const maxPosts = CONFIG.storage.maxPosts;
+    const countQuery = db.query<{ count: number }, [string]>('SELECT COUNT(*) as count FROM posts WHERE channel_id = ?');
+    const countResult = countQuery.get(channel);
 
-    if (countResult.count > maxPosts) {
+    if (countResult && countResult.count > maxPosts) {
       // 获取需要删除的文章 ID
-      const deleteQuery = db.query(`
+      const deleteQuery = db.query<{ id: string }, [string, number]>(`
         SELECT id FROM posts
         WHERE channel_id = ?
         ORDER BY pub_date DESC
         LIMIT -1 OFFSET ?
       `);
-      const toDelete = deleteQuery.all(channel, maxPosts) as any[];
+      const toDelete = deleteQuery.all(channel, maxPosts);
 
       if (toDelete.length > 0) {
         const deletePost = db.query('DELETE FROM posts WHERE id = ?');
@@ -156,27 +168,10 @@ export async function addPost(post: Post, channel: string): Promise<{ id: string
 
     db.run('COMMIT');
 
-    // 返回新创建的文章 ID
     return { id: post.id, isNew: true };
   } catch (error) {
     db.run('ROLLBACK');
     throw error;
-  }
-}
-
-/**
- * 读取主题配置
- */
-export async function readThemes(): Promise<Record<string, any>> {
-  try {
-    const file = Bun.file(CONFIG.storage.themesFile);
-    const exists = await file.exists();
-    if (!exists) return {};
-
-    return await file.json();
-  } catch (error) {
-    console.error('Failed to read themes:', error);
-    return {};
   }
 }
 
@@ -186,22 +181,27 @@ export async function readThemes(): Promise<Record<string, any>> {
 export async function readChannel(channelId: string): Promise<Channel | null> {
   const db = getDatabase();
 
-  const query = db.query(`
+  const query = db.query<DBChannel, [string]>(`
     SELECT
-      id, name, description, theme, language, max_posts as maxPosts,
-      token, created_at as createdAt, updated_at as updatedAt
+      id, name, description, theme, language, max_posts,
+      token, created_at, updated_at
     FROM channels
     WHERE id = ?
   `);
 
-  const row = query.get(channelId) as any;
+  const row = query.get(channelId);
 
   if (!row) return null;
 
   return {
-    ...row,
-    createdAt: new Date(row.createdAt),
-    updatedAt: new Date(row.updatedAt),
+    id: row.id,
+    name: row.name,
+    description: row.description,
+    theme: row.theme ?? undefined,
+    language: row.language ?? undefined,
+    token: row.token,
+    createdAt: new Date(row.created_at),
+    updatedAt: new Date(row.updated_at),
   };
 }
 
@@ -211,21 +211,26 @@ export async function readChannel(channelId: string): Promise<Channel | null> {
 export async function readAllChannels(): Promise<Record<string, Channel>> {
   const db = getDatabase();
 
-  const query = db.query(`
+  const query = db.query<DBChannel, []>(`
     SELECT
-      id, name, description, theme, language, max_posts as maxPosts,
-      token, created_at as createdAt, updated_at as updatedAt
+      id, name, description, theme, language, max_posts,
+      token, created_at, updated_at
     FROM channels
   `);
 
-  const rows = query.all() as any[];
+  const rows = query.all();
 
   const channels: Record<string, Channel> = {};
   for (const row of rows) {
     channels[row.id] = {
-      ...row,
-      createdAt: new Date(row.createdAt),
-      updatedAt: new Date(row.updatedAt),
+      id: row.id,
+      name: row.name,
+      description: row.description,
+      theme: row.theme ?? undefined,
+      language: row.language ?? undefined,
+      token: row.token,
+      createdAt: new Date(row.created_at),
+      updatedAt: new Date(row.updated_at),
     };
   }
 
@@ -239,7 +244,7 @@ export async function createChannel(channel: Channel): Promise<void> {
   const db = getDatabase();
 
   // 检查频道是否已存在
-  const existsQuery = db.query('SELECT id FROM channels WHERE id = ?');
+  const existsQuery = db.query<{ id: string }, [string]>('SELECT id FROM channels WHERE id = ?');
   const exists = existsQuery.get(channel.id);
 
   if (exists) {
@@ -257,9 +262,9 @@ export async function createChannel(channel: Channel): Promise<void> {
     channel.id,
     channel.name,
     channel.description,
-    channel.theme || 'spring',
-    channel.language || 'zh-CN',
-    channel.maxPosts || 100,
+    channel.theme || null,
+    channel.language || null,
+    100, // max_posts 使用数据库默认值
     channel.token,
     now,
     now
@@ -273,7 +278,7 @@ export async function updateChannel(channelId: string, updates: Partial<Channel>
   const db = getDatabase();
 
   // 检查频道是否存在
-  const existsQuery = db.query('SELECT id FROM channels WHERE id = ?');
+  const existsQuery = db.query<{ id: string }, [string]>('SELECT id FROM channels WHERE id = ?');
   const exists = existsQuery.get(channelId);
 
   if (!exists) {
@@ -282,7 +287,7 @@ export async function updateChannel(channelId: string, updates: Partial<Channel>
 
   // 构建更新语句
   const fields: string[] = [];
-  const values: any[] = [];
+  const values: (string | number | null)[] = [];
 
   if (updates.name !== undefined) {
     fields.push('name = ?');
@@ -299,10 +304,6 @@ export async function updateChannel(channelId: string, updates: Partial<Channel>
   if (updates.language !== undefined) {
     fields.push('language = ?');
     values.push(updates.language);
-  }
-  if (updates.maxPosts !== undefined) {
-    fields.push('max_posts = ?');
-    values.push(updates.maxPosts);
   }
   if (updates.token !== undefined) {
     fields.push('token = ?');
@@ -337,7 +338,7 @@ export async function deleteChannel(channelId: string): Promise<void> {
   const db = getDatabase();
 
   // 检查频道是否存在
-  const existsQuery = db.query('SELECT id FROM channels WHERE id = ?');
+  const existsQuery = db.query<{ id: string }, [string]>('SELECT id FROM channels WHERE id = ?');
   const exists = existsQuery.get(channelId);
 
   if (!exists) {
@@ -347,4 +348,98 @@ export async function deleteChannel(channelId: string): Promise<void> {
   // 删除频道（外键级联会自动删除相关文章和标签）
   const deleteQuery = db.query('DELETE FROM channels WHERE id = ?');
   deleteQuery.run(channelId);
+}
+
+/** 活跃频道统计结果 */
+export interface ActiveChannelStats {
+  last7Days: {
+    count: number;
+    channels: Array<{
+      id: string;
+      name: string;
+      postCount: number;
+      lastPostDate: string;
+    }>;
+  };
+  last30Days: {
+    count: number;
+    channels: Array<{
+      id: string;
+      name: string;
+      postCount: number;
+      lastPostDate: string;
+    }>;
+  };
+}
+
+/** 活跃频道查询结果 */
+interface ActiveChannelQueryResult {
+  id: string;
+  name: string;
+  postCount: number;
+  lastPostDate: string;
+}
+
+/**
+ * 获取活跃频道统计
+ * 查询最近 7 天和 30 天内有文章发布的频道
+ */
+export async function getActiveChannelsStats(): Promise<ActiveChannelStats> {
+  const db = getDatabase();
+
+  const now = new Date();
+  const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+  const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+  // 查询最近 7 天活跃频道
+  const query7Days = db.query<ActiveChannelQueryResult, [string]>(`
+    SELECT
+      c.id,
+      c.name,
+      COUNT(p.id) as postCount,
+      MAX(p.pub_date) as lastPostDate
+    FROM channels c
+    INNER JOIN posts p ON c.id = p.channel_id
+    WHERE p.pub_date >= ?
+    GROUP BY c.id
+    ORDER BY postCount DESC
+  `);
+
+  // 查询最近 30 天活跃频道
+  const query30Days = db.query<ActiveChannelQueryResult, [string]>(`
+    SELECT
+      c.id,
+      c.name,
+      COUNT(p.id) as postCount,
+      MAX(p.pub_date) as lastPostDate
+    FROM channels c
+    INNER JOIN posts p ON c.id = p.channel_id
+    WHERE p.pub_date >= ?
+    GROUP BY c.id
+    ORDER BY postCount DESC
+  `);
+
+  const channels7Days = query7Days.all(sevenDaysAgo.toISOString());
+  const channels30Days = query30Days.all(thirtyDaysAgo.toISOString());
+
+  return {
+    last7Days: {
+      count: channels7Days.length,
+      channels: channels7Days.map((row) => ({
+        id: row.id,
+        name: row.name,
+        postCount: row.postCount,
+        lastPostDate: row.lastPostDate,
+      })),
+    },
+    last30Days: {
+      count: channels30Days.length,
+      channels: channels30Days.map((row) => ({
+        id: row.id,
+        name: row.name,
+        postCount: row.postCount,
+        lastPostDate: row.lastPostDate,
+      })),
+    },
+  };
 }

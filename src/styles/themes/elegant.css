@@ -1,0 +1,88 @@
+/**
+ * Elegant Theme
+ * Elegant serif typography, suitable for articles and essays
+ */
+
+body {
+  color: #333;
+  font-family: Georgia, 'Times New Roman', serif;
+}
+
+a {
+  color: #8b4513;
+}
+
+a:hover {
+  color: #a0522d;
+  text-decoration: underline;
+}
+
+/* Headings */
+h1, h2, h3, h4, h5, h6 {
+  color: #1a1a1a;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+/* Inline code */
+code {
+  background: #faf5ef;
+  color: #8b4513;
+  font-family: 'Courier New', monospace;
+}
+
+/* Code blocks */
+pre {
+  background: #faf5ef;
+  border: 1px solid #e8dcc8;
+}
+
+pre code {
+  color: #333;
+}
+
+/* Tables */
+table {
+  border: 1px solid #d4c4a8;
+}
+
+thead {
+  background: #faf5ef;
+}
+
+th {
+  border-bottom: 2px solid #8b4513;
+}
+
+td {
+  border-bottom: 1px solid #e8dcc8;
+}
+
+/* Blockquote */
+blockquote {
+  border-left-color: #8b4513;
+  color: #555;
+  background: #faf5ef;
+  font-style: italic;
+}
+
+/* Horizontal rule */
+hr {
+  border-top-color: #d4c4a8;
+}
+
+/* Mark */
+mark {
+  background: #fff8dc;
+}
+
+/* Inserted text */
+ins {
+  background: #f0fff0;
+  color: #228b22;
+}
+
+/* Deleted text */
+del {
+  color: #8b0000;
+  background: #fff0f0;
+}

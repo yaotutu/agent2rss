@@ -30,7 +30,7 @@ export const CONFIG = {
 
   // 内容配置
   content: {
-    defaultTheme: 'spring',
+    defaultTheme: 'github',
     defaultSummaryLength: 150,
   },
 

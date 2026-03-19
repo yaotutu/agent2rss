@@ -1,0 +1,179 @@
+/**
+ * Base CSS - Layout only (shared by all themes)
+ * These styles are required to prevent overflow on mobile devices
+ * DO NOT add colors here - put colors in theme-specific CSS files
+ */
+
+/* Prevent overflow globally */
+* {
+  box-sizing: border-box;
+  max-width: 100%;
+}
+
+/* Typography base */
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+  margin: 0;
+  padding: 16px;
+}
+
+/* Text overflow handling */
+p, div, span, li, td, th {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+/* Links */
+a {
+  text-decoration: none;
+  word-break: break-all;
+  overflow-wrap: anywhere;
+}
+
+/* Headings */
+h1, h2, h3, h4, h5, h6 {
+  line-height: 1.25;
+  margin: 24px 0 16px;
+}
+
+h1 { font-size: 28px; font-weight: 700; }
+h2 { font-size: 22px; font-weight: 600; }
+h3 { font-size: 18px; font-weight: 600; }
+h4 { font-size: 16px; font-weight: 600; }
+h5 { font-size: 14px; font-weight: 600; }
+h6 { font-size: 13px; font-weight: 600; }
+
+/* Paragraphs */
+p {
+  margin: 16px 0;
+  line-height: 1.6;
+}
+
+/* Lists */
+ul, ol {
+  margin: 16px 0;
+  padding-left: 24px;
+}
+
+li {
+  margin: 4px 0;
+  line-height: 1.6;
+}
+
+/* Inline code */
+code {
+  font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+  font-size: 14px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  word-break: break-all;
+}
+
+/* Code blocks */
+pre {
+  padding: 16px;
+  border-radius: 6px;
+  margin: 16px 0;
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+pre code {
+  background: transparent;
+  padding: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* Tables */
+table {
+  width: 100%;
+  max-width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0;
+  table-layout: fixed;
+}
+
+th, td {
+  padding: 12px;
+  text-align: left;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+th {
+  font-weight: 600;
+}
+
+/* Blockquote */
+blockquote {
+  border-left-width: 4px;
+  border-left-style: solid;
+  margin: 16px 0;
+  padding: 8px 16px;
+}
+
+blockquote p {
+  margin: 8px 0;
+}
+
+/* Horizontal rule */
+hr {
+  border: 0;
+  border-top-style: solid;
+  border-top-width: 1px;
+  margin: 24px 0;
+}
+
+/* Images */
+img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 6px;
+  margin: 16px 0;
+}
+
+/* Mark/Highlight */
+mark {
+  padding: 2px 4px;
+}
+
+/* Inserted/Deleted text */
+ins {
+  text-decoration: underline;
+}
+
+del {
+  text-decoration: line-through;
+}
+
+/* Footnotes */
+.footnotes {
+  margin-top: 32px;
+  padding-top: 16px;
+  font-size: 14px;
+}
+
+/* Definition lists */
+dl {
+  margin: 16px 0;
+}
+
+dt {
+  font-weight: 600;
+  margin-top: 8px;
+}
+
+dd {
+  margin-left: 16px;
+}
+
+/* Abbreviations */
+abbr[title] {
+  text-decoration: underline dotted;
+  cursor: help;
+}

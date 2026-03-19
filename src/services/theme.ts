@@ -1,133 +1,142 @@
-import { CONFIG } from '../config/index.js';
-import type { Theme, Themes, ThemeStyles } from '../types/index.js';
-import { readThemes } from './storage.js';
-import { cleanStyle } from '../utils/index.js';
+import juice from 'juice';
+import { readFileSync } from 'fs';
+import { join } from 'path';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
 
-/**
- * 默认主题（作为后备）
- */
-function getDefaultTheme(): Theme {
-  return {
-    name: 'GitHub',
-    description: 'GitHub 官方风格',
-    styles: {
-      pre: 'background:#f6f8fa;padding:16px;border-radius:6px;margin:16px 0',
-      codeInline: 'background:#f6f8fa;padding:2px 6px;border-radius:3px;font-family:monospace;font-size:14px;color:#e83e8c',
-      table: 'border-collapse:collapse;margin:16px 0',
-      thead: 'background:#f6f8fa',
-      th: 'padding:12px;text-align:left;font-weight:600',
-      td: 'padding:12px',
-      tr: '',
-      blockquote: 'border-left:4px solid #0969da;margin:16px 0;padding:8px 16px;color:#57606a',
-      h1: 'font-size:32px;font-weight:700;margin:24px 0 16px;line-height:1.25;color:#1f2328',
-      h2: 'font-size:24px;font-weight:600;margin:24px 0 16px;line-height:1.25;color:#1f2328',
-      h3: 'font-size:20px;font-weight:600;margin:16px 0 12px;line-height:1.25;color:#1f2328',
-      h4: 'font-size:16px;font-weight:600;margin:16px 0 12px;line-height:1.25;color:#1f2328',
-      h5: 'font-size:14px;font-weight:600;margin:16px 0 12px;line-height:1.25;color:#1f2328',
-      h6: 'font-size:13px;font-weight:600;margin:16px 0 12px;line-height:1.25;color:#57606a',
-      p: 'margin:16px 0;line-height:1.6;color:#24292f',
-      ul: 'margin:16px 0;padding-left:32px',
-      ol: 'margin:16px 0;padding-left:32px',
-      li: 'margin:4px 0;line-height:1.6',
-      a: 'color:#0969da;text-decoration:none',
-      hr: 'border:0;border-top:1px solid #d0d7de;margin:24px 0',
-      mark: 'background:#fff8c5;padding:2px 4px',
-      ins: 'text-decoration:underline;background:#d4f8d4',
-      del: 'text-decoration:line-through;color:#82071e;background:#ffebe9',
-      img: 'border-radius:6px;margin:16px 0'
-    }
-  };
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+// CSS 缓存
+const cssCache: Map<string, string> = new Map();
+
+// 可用主题列表
+export const availableThemes: Record<string, ThemeMeta> = {
+  github: { name: 'GitHub', description: 'GitHub 官方风格，适合技术文档' },
+  dark: { name: 'Dark', description: '深色模式，适合夜间阅读' },
+  minimal: { name: 'Minimal', description: '极简设计，适合长文阅读' },
+  modern: { name: 'Modern', description: '现代扁平设计，鲜艳配色' },
+  elegant: { name: 'Elegant', description: '优雅衬线字体，适合文章随笔' },
+  clean: { name: 'Clean', description: '简洁干净，高可读性' },
+  spring: { name: 'Spring', description: '清新绿色调，充满活力' },
+};
+
+export interface ThemeMeta {
+  name: string;
+  description: string;
 }
 
-// 全局主题缓存
-let themes: Themes = {};
-
 /**
- * 加载主题配置
+ * 加载 CSS 文件
  */
-export async function loadThemes(): Promise<void> {
+function loadCss(filename: string): string {
+  if (cssCache.has(filename)) {
+    return cssCache.get(filename)!;
+  }
+
   try {
-    const loadedThemes = await readThemes();
-    themes = { ...loadedThemes };
-
-    if (Object.keys(themes).length === 0) {
-      console.warn('⚠️  未找到主题，使用默认主题');
-      themes = { github: getDefaultTheme() };
-    }
-
-    console.log(`✅ 已加载 ${Object.keys(themes).length} 个主题:`, Object.keys(themes).join(', '));
+    const cssPath = join(__dirname, '../styles', filename);
+    const css = readFileSync(cssPath, 'utf-8');
+    cssCache.set(filename, css);
+    return css;
   } catch (error) {
-    console.error('❌ 加载主题失败:', error);
-    themes = { github: getDefaultTheme() };
+    console.error(`Failed to load CSS: ${filename}`, error);
+    return '';
   }
 }
 
 /**
- * 获取主题
+ * 获取主题的 CSS
  */
-export function getTheme(themeName: string): Theme {
-  return themes[themeName] || themes.github || getDefaultTheme();
+function getThemeCss(themeName: string): string {
+  // 验证主题是否存在
+  if (!availableThemes[themeName]) {
+    themeName = 'github'; // 回退到默认主题
+  }
+
+  // 加载基础布局 CSS
+  const baseCss = loadCss('base.css');
+
+  // 加载主题颜色 CSS
+  const themeCss = loadCss(`themes/${themeName}.css`);
+
+  return baseCss + '\n' + themeCss;
 }
 
 /**
- * 获取所有主题
+ * 清除 CSS 缓存（用于测试或热重载）
  */
-export function getAllThemes(): Themes {
-  return themes;
+export function clearCssCache(): void {
+  cssCache.clear();
 }
 
 /**
- * 为 HTML 添加内联样式
+ * 获取所有可用主题
  */
-export function addInlineStyles(html: string, themeName: string = CONFIG.content.defaultTheme): string {
-  const theme = getTheme(themeName).styles;
-
-  return html
-    // 代码块
-    .replace(/<pre>/g, `<pre style="${cleanStyle(theme.pre || '')};max-width:100%;overflow-x:auto">`)
-    .replace(/<code class="language-/g, `<code style="font-family:'SF Mono',Monaco,'Cascadia Code','Roboto Mono',Consolas,'Courier New',monospace;font-size:14px;line-height:1.5" class="language-`)
-    .replace(/<code>/g, `<code style="${cleanStyle(theme.codeInline || '')}">`)
-
-    // 表格
-    .replace(/<table>/g, `<table style="${cleanStyle(theme.table || '')};width:100%;max-width:100%;table-layout:fixed;border-collapse:collapse">`)
-    .replace(/<thead>/g, `<thead style="${cleanStyle(theme.thead || '')}">`)
-    .replace(/<th>/g, `<th style="${cleanStyle(theme.th || '')};word-wrap:break-word;overflow-wrap:break-word">`)
-    .replace(/<td>/g, `<td style="${cleanStyle(theme.td || '')};word-wrap:break-word;overflow-wrap:break-word">`)
-    .replace(/<tr>/g, `<tr style="${cleanStyle(theme.tr || '')}">`)
-
-    // 引用块
-    .replace(/<blockquote>/g, `<blockquote style="${cleanStyle(theme.blockquote || '')};max-width:100%">`)
-
-    // 标题
-    .replace(/<h1>/g, `<h1 style="${cleanStyle(theme.h1 || '')};max-width:100%">`)
-    .replace(/<h2>/g, `<h2 style="${cleanStyle(theme.h2 || '')};max-width:100%">`)
-    .replace(/<h3>/g, `<h3 style="${cleanStyle(theme.h3 || '')};max-width:100%">`)
-    .replace(/<h4>/g, `<h4 style="${cleanStyle(theme.h4 || '')};max-width:100%">`)
-    .replace(/<h5>/g, `<h5 style="${cleanStyle(theme.h5 || '')};max-width:100%">`)
-    .replace(/<h6>/g, `<h6 style="${cleanStyle(theme.h6 || '')};max-width:100%">`)
-
-    // 段落和列表
-    .replace(/<p>/g, `<p style="${cleanStyle(theme.p || '')};max-width:100%;word-wrap:break-word">`)
-    .replace(/<ul>/g, `<ul style="${cleanStyle(theme.ul || '')}">`)
-    .replace(/<ol>/g, `<ol style="${cleanStyle(theme.ol || '')}">`)
-    .replace(/<li>/g, `<li style="${cleanStyle(theme.li || '')}">`)
-
-    // 链接（先添加样式）
-    .replace(/<a /g, `<a style="${cleanStyle(theme.a || '')}" `)
-
-    // 链接（外部链接添加安全属性）
-    .replace(/<a ([^>]*)href="([^"]+)"([^>]*)>/g, (match, before, url, after) => {
-      const isExternal = url.startsWith('http://') || url.startsWith('https://');
-
-      if (isExternal) {
-        return `<a ${before}href="${url}"${after} rel="noopener noreferrer" target="_blank">`;
-      } else {
-        return match;
-      }
-    })
-    .replace(/<hr>/g, `<hr style="${cleanStyle(theme.hr || '')};max-width:100%">`)
-    .replace(/<mark>/g, `<mark style="${cleanStyle(theme.mark || '')}">`)
-    .replace(/<ins>/g, `<ins style="${cleanStyle(theme.ins || '')}">`)
-    .replace(/<del>/g, `<del style="${cleanStyle(theme.del || '')}">`)
-    .replace(/<img /g, `<img style="${cleanStyle(theme.img || '')};max-width:100%;height:auto" `);
+export function getAllThemes(): Record<string, ThemeMeta> {
+  return availableThemes;
 }
+
+/**
+ * 获取主题信息
+ */
+export function getTheme(themeName: string): ThemeMeta {
+  return availableThemes[themeName] || availableThemes.github;
+}
+
+/**
+ * 为 HTML 添加内联样式（使用 juice）
+ *
+ * @param html - 原始 HTML 内容
+ * @param themeName - 主题名称
+ * @returns 带内联样式的 HTML
+ */
+export function addInlineStyles(html: string, themeName: string = 'github'): string {
+  const css = getThemeCss(themeName);
+
+  if (!css) {
+    console.warn('CSS not loaded, returning original HTML');
+    return html;
+  }
+
+  try {
+    // 使用 juice 内联 CSS
+    const options: juice.Options = {
+      extraCss: css,
+      preserveImportant: true,
+      applyStyleTags: false,
+      removeStyleTags: true,
+      preserveMediaQueries: false,
+    };
+
+    // 包装 HTML 为完整文档
+    const wrappedHtml = `<div id="juice-wrapper">${html}</div>`;
+    const inlined = juice(wrappedHtml, options);
+
+    // 提取内容（移除包装 div）
+    const match = inlined.match(/<div id="juice-wrapper"[^>]*>([\s\S]*)<\/div>\s*$/);
+    return match ? match[1] : inlined;
+  } catch (error) {
+    console.error('Juice inline error:', error);
+    return html;
+  }
+}
+
+/**
+ * 加载主题（兼容旧接口）
+ */
+export async function loadThemes(): Promise<void> {
+  // 预加载基础 CSS
+  loadCss('base.css');
+
+  const themeNames = Object.keys(availableThemes);
+  console.log(`✅ 已加载 ${themeNames.length} 个主题: ${themeNames.join(', ')}`);
+}
+
+// 兼容旧类型导出
+export interface Theme {
+  name: string;
+  description: string;
+}
+
+export type Themes = Record<string, Theme>;

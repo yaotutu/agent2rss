@@ -1,0 +1,94 @@
+/**
+ * Modern Theme
+ * Modern flat design with vibrant colors
+ */
+
+body {
+  color: #2d3748;
+}
+
+a {
+  color: #4299e1;
+}
+
+a:hover {
+  color: #2b6cb0;
+  text-decoration: underline;
+}
+
+/* Headings */
+h1, h2, h3, h4 {
+  color: #1a202c;
+}
+
+h5, h6 {
+  color: #4a5568;
+}
+
+/* Inline code */
+code {
+  background: #edf2f7;
+  color: #e53e3e;
+}
+
+/* Code blocks */
+pre {
+  background: #2d3748;
+  border-radius: 8px;
+}
+
+pre code {
+  color: #e2e8f0;
+}
+
+/* Tables */
+table {
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+thead {
+  background: #4299e1;
+}
+
+thead th {
+  color: #fff;
+}
+
+th, td {
+  border: none;
+}
+
+tr:nth-child(even) {
+  background: #f7fafc;
+}
+
+/* Blockquote */
+blockquote {
+  border-left-color: #4299e1;
+  color: #4a5568;
+  background: #ebf8ff;
+  border-radius: 0 8px 8px 0;
+}
+
+/* Horizontal rule */
+hr {
+  border-top-color: #e2e8f0;
+}
+
+/* Mark */
+mark {
+  background: #faf089;
+}
+
+/* Inserted text */
+ins {
+  background: #c6f6d5;
+  color: #22543d;
+}
+
+/* Deleted text */
+del {
+  color: #c53030;
+  background: #fed7d7;
+}
