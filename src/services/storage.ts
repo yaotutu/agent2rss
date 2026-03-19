@@ -1,5 +1,5 @@
 import { getDatabase } from './database.js';
-import type { Post, Channel, DBChannel, DBChannelConfig } from '../types/index.js';
+import type { Post, Channel, DBChannel } from '../types/index.js';
 import { CONFIG } from '../config/index.js';
 
 /** 带别名的文章查询结果 */
@@ -92,10 +92,10 @@ export async function addPost(post: Post, channel: string): Promise<{ id: string
   const db = getDatabase();
 
   // 检查频道是否存在
-  const channelQuery = db.query<DBChannelConfig, [string]>('SELECT id, max_posts FROM channels WHERE id = ?');
-  const channelConfig = channelQuery.get(channel);
+  const channelQuery = db.query<{ id: string }, [string]>('SELECT id FROM channels WHERE id = ?');
+  const channelExists = channelQuery.get(channel);
 
-  if (!channelConfig) {
+  if (!channelExists) {
     throw new Error(`Channel "${channel}" not found`);
   }
 
@@ -143,8 +143,8 @@ export async function addPost(post: Post, channel: string): Promise<{ id: string
       }
     }
 
-    // 检查该频道的文章数量，删除超过限制的旧文章
-    const maxPosts = channelConfig.max_posts || CONFIG.storage.maxPosts;
+    // 检查该频道的文章数量，删除超过限制的旧文章（全局固定 100）
+    const maxPosts = CONFIG.storage.maxPosts;
     const countQuery = db.query<{ count: number }, [string]>('SELECT COUNT(*) as count FROM posts WHERE channel_id = ?');
     const countResult = countQuery.get(channel);
 
@@ -199,7 +199,6 @@ export async function readChannel(channelId: string): Promise<Channel | null> {
     description: row.description,
     theme: row.theme ?? undefined,
     language: row.language ?? undefined,
-    maxPosts: row.max_posts,
     token: row.token,
     createdAt: new Date(row.created_at),
     updatedAt: new Date(row.updated_at),
@@ -229,7 +228,6 @@ export async function readAllChannels(): Promise<Record<string, Channel>> {
       description: row.description,
       theme: row.theme ?? undefined,
       language: row.language ?? undefined,
-      maxPosts: row.max_posts,
       token: row.token,
       createdAt: new Date(row.created_at),
       updatedAt: new Date(row.updated_at),
@@ -266,7 +264,7 @@ export async function createChannel(channel: Channel): Promise<void> {
     channel.description,
     channel.theme || null,
     channel.language || null,
-    channel.maxPosts || 100,
+    100, // max_posts 使用数据库默认值
     channel.token,
     now,
     now
@@ -306,10 +304,6 @@ export async function updateChannel(channelId: string, updates: Partial<Channel>
   if (updates.language !== undefined) {
     fields.push('language = ?');
     values.push(updates.language);
-  }
-  if (updates.maxPosts !== undefined) {
-    fields.push('max_posts = ?');
-    values.push(updates.maxPosts);
   }
   if (updates.token !== undefined) {
     fields.push('token = ?');

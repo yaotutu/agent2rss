@@ -72,7 +72,6 @@ curl -X POST https://agent2rss.yaotutu.top:8765/api/channels \
     "token": "ch_4fd9cdce724ffb8d6ec69187b5438ae2",
     "theme": "spring",
     "language": "zh-CN",
-    "maxPosts": 100,
     "createdAt": "2026-02-05T10:30:00.000Z"
   },
   "rssUrl": "https://agent2rss.yaotutu.top:8765/channels/8cf83b0d-f856-4f7c-bd1c-4f6ca0338ece/rss.xml"
@@ -87,7 +86,6 @@ curl -X POST https://agent2rss.yaotutu.top:8765/api/channels \
 - `token`: 频道 Token，用于鉴权（格式：`ch_` + 32位随机字符串）
 - `theme`: 主题名称（默认：spring）
 - `language`: 语言代码（默认：zh-CN）
-- `maxPosts`: 最大文章数（默认：100）
 - `rssUrl`: RSS Feed 订阅地址
 - `createdAt`: 创建时间（ISO 8601 格式）
 
@@ -243,7 +241,6 @@ curl -X GET https://agent2rss.yaotutu.top:8765/api/channels
       "description": "Daily news summaries powered by AI",
       "theme": "spring",
       "language": "zh-CN",
-      "maxPosts": 100,
       "createdAt": "2026-02-05T10:00:00.000Z"
     },
     {
@@ -252,7 +249,6 @@ curl -X GET https://agent2rss.yaotutu.top:8765/api/channels
       "description": "分享技术文章和教程",
       "theme": "github",
       "language": "zh-CN",
-      "maxPosts": 100,
       "createdAt": "2026-02-05T10:30:00.000Z"
     }
   ]
@@ -278,7 +274,6 @@ curl -X GET https://agent2rss.yaotutu.top:8765/api/channels/8cf83b0d-f856-4f7c-b
     "description": "分享技术文章和教程",
     "theme": "github",
     "language": "zh-CN",
-    "maxPosts": 100,
     "createdAt": "2026-02-05T10:30:00.000Z",
     "updatedAt": "2026-02-05T15:30:00.000Z"
   },

@@ -18,10 +18,6 @@ export const CreateChannelBodySchema = z.object({
     description: '语言代码（可选，默认 zh-CN）',
     example: 'zh-CN',
   }),
-  maxPosts: z.number().int().positive().optional().openapi({
-    description: '最大文章数（可选，默认 100）',
-    example: 100,
-  }),
 });
 
 // 更新频道请求体
@@ -42,10 +38,6 @@ export const UpdateChannelBodySchema = z.object({
     description: '语言代码',
     example: 'en-US',
   }),
-  maxPosts: z.number().int().positive().optional().openapi({
-    description: '最大文章数',
-    example: 200,
-  }),
 });
 
 // 频道信息 Schema
@@ -55,7 +47,6 @@ export const ChannelInfoSchema = z.object({
   description: z.string().openapi({ example: '分享最新的技术动态' }),
   theme: z.string().openapi({ example: 'spring' }),
   language: z.string().openapi({ example: 'zh-CN' }),
-  maxPosts: z.number().openapi({ example: 100 }),
   token: z.string().optional().openapi({
     description: '仅授权用户可见',
     example: 'ch_4fd9cdce724ffb8d6ec69187b5438ae2',
@@ -107,7 +98,6 @@ export const UpdateChannelSuccessSchema = z.object({
     description: z.string(),
     theme: z.string(),
     language: z.string(),
-    maxPosts: z.number(),
     createdAt: z.string().openapi({ description: 'ISO 8601 日期时间' }),
     updatedAt: z.string().openapi({ description: 'ISO 8601 日期时间' }),
   }),

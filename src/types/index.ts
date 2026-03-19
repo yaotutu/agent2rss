@@ -45,7 +45,6 @@ export interface DBPostTag {
 /** 数据库中的频道配置行 */
 export interface DBChannelConfig {
   id: string;
-  max_posts: number | null;
 }
 
 // ============== 应用层类型 ==============
@@ -62,7 +61,6 @@ export interface Channel {
   name: string;                  // 显示名称
   description: string;           // RSS 描述
   theme?: string;                // 主题 (默认使用全局配置)
-  maxPosts?: number;             // 最大文章数 (默认使用全局配置)
   language?: string;             // 语言 (默认: zh-CN)
   token: string;                 // 频道密钥 (用于鉴权)
   createdAt: Date;
