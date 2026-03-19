@@ -1,0 +1,77 @@
+/**
+ * Clean Theme
+ * Clean and simple, high readability
+ */
+
+body {
+  color: #333;
+  background: #fff;
+}
+
+a {
+  color: #0066cc;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+/* Headings */
+h1, h2, h3, h4, h5, h6 {
+  color: #000;
+}
+
+/* Inline code */
+code {
+  background: #f8f8f8;
+  color: #c7254e;
+}
+
+/* Code blocks */
+pre {
+  background: #f8f8f8;
+}
+
+pre code {
+  color: #333;
+}
+
+/* Tables */
+thead {
+  background: #f8f8f8;
+}
+
+th {
+  border-bottom: 2px solid #ddd;
+}
+
+td {
+  border-bottom: 1px solid #eee;
+}
+
+/* Blockquote */
+blockquote {
+  border-left-color: #ccc;
+  color: #666;
+}
+
+/* Horizontal rule */
+hr {
+  border-top-color: #eee;
+}
+
+/* Mark */
+mark {
+  background: #ffeb3b;
+}
+
+/* Inserted text */
+ins {
+  background: #e8f5e9;
+}
+
+/* Deleted text */
+del {
+  color: #999;
+  background: #fafafa;
+}

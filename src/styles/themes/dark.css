@@ -1,0 +1,87 @@
+/**
+ * Dark Theme
+ * Dark mode for comfortable reading at night
+ */
+
+body {
+  color: #e6edf3;
+  background: #0d1117;
+}
+
+a {
+  color: #58a6ff;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+/* Headings */
+h1, h2, h3, h4, h5, h6 {
+  color: #e6edf3;
+}
+
+h1, h2 {
+  border-bottom: 1px solid #30363d;
+  padding-bottom: 8px;
+}
+
+/* Inline code */
+code {
+  background: #161b22;
+  color: #ff7b72;
+}
+
+/* Code blocks */
+pre {
+  background: #161b22;
+  border: 1px solid #30363d;
+}
+
+pre code {
+  color: #e6edf3;
+}
+
+/* Tables */
+table {
+  border: 1px solid #30363d;
+}
+
+thead {
+  background: #161b22;
+}
+
+th, td {
+  border: 1px solid #30363d;
+}
+
+/* Blockquote */
+blockquote {
+  border-left-color: #58a6ff;
+  color: #8b949e;
+  background: #161b22;
+  border-radius: 0 6px 6px 0;
+}
+
+/* Horizontal rule */
+hr {
+  border-top-color: #30363d;
+}
+
+/* Mark */
+mark {
+  background: #634d00;
+  color: #e6edf3;
+}
+
+/* Inserted text */
+ins {
+  background: #1f4d2c;
+  color: #3fb950;
+}
+
+/* Deleted text */
+del {
+  color: #f85149;
+  background: #4d1515;
+}

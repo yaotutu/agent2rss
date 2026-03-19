@@ -1,28 +1,25 @@
 /**
- * Base CSS for RSS feeds
- * Mobile-first approach - works on all screen sizes
- * Inlined by juice for RSS reader compatibility
+ * Base CSS - Layout only (shared by all themes)
+ * These styles are required to prevent overflow on mobile devices
+ * DO NOT add colors here - put colors in theme-specific CSS files
  */
 
-/* Reset & base */
+/* Prevent overflow globally */
 * {
   box-sizing: border-box;
   max-width: 100%;
 }
 
-/* Typography */
+/* Typography base */
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   font-size: 16px;
   line-height: 1.6;
-  color: #24292f;
   margin: 0;
   padding: 16px;
-  overflow-wrap: anywhere;
-  word-break: break-word;
 }
 
-/* Prevent overflow on all text elements */
+/* Text overflow handling */
 p, div, span, li, td, th {
   overflow-wrap: anywhere;
   word-break: break-word;
@@ -30,30 +27,23 @@ p, div, span, li, td, th {
 
 /* Links */
 a {
-  color: #0969da;
   text-decoration: none;
   word-break: break-all;
   overflow-wrap: anywhere;
 }
 
-a:hover {
-  text-decoration: underline;
-}
-
 /* Headings */
 h1, h2, h3, h4, h5, h6 {
-  margin: 24px 0 16px;
   line-height: 1.25;
-  color: #1f2328;
-  font-weight: 600;
+  margin: 24px 0 16px;
 }
 
 h1 { font-size: 28px; font-weight: 700; }
-h2 { font-size: 22px; }
-h3 { font-size: 18px; }
-h4 { font-size: 16px; }
-h5 { font-size: 14px; }
-h6 { font-size: 13px; color: #57606a; }
+h2 { font-size: 22px; font-weight: 600; }
+h3 { font-size: 18px; font-weight: 600; }
+h4 { font-size: 16px; font-weight: 600; }
+h5 { font-size: 14px; font-weight: 600; }
+h6 { font-size: 13px; font-weight: 600; }
 
 /* Paragraphs */
 p {
@@ -72,20 +62,17 @@ li {
   line-height: 1.6;
 }
 
-/* Code - inline */
+/* Inline code */
 code {
   font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
   font-size: 14px;
-  background: #f6f8fa;
   padding: 2px 6px;
   border-radius: 3px;
-  color: #e83e8c;
   word-break: break-all;
 }
 
-/* Code - block */
+/* Code blocks */
 pre {
-  background: #f6f8fa;
   padding: 16px;
   border-radius: 6px;
   margin: 16px 0;
@@ -96,7 +83,6 @@ pre {
 pre code {
   background: transparent;
   padding: 0;
-  color: #24292f;
   font-size: 14px;
   line-height: 1.5;
   white-space: pre-wrap;
@@ -112,14 +98,9 @@ table {
   table-layout: fixed;
 }
 
-thead {
-  background: #f6f8fa;
-}
-
 th, td {
   padding: 12px;
   text-align: left;
-  border: 1px solid #d0d7de;
   word-wrap: break-word;
   overflow-wrap: break-word;
 }
@@ -130,11 +111,10 @@ th {
 
 /* Blockquote */
 blockquote {
-  border-left: 4px solid #0969da;
+  border-left-width: 4px;
+  border-left-style: solid;
   margin: 16px 0;
   padding: 8px 16px;
-  color: #57606a;
-  background: #f6f8fa;
 }
 
 blockquote p {
@@ -144,7 +124,8 @@ blockquote p {
 /* Horizontal rule */
 hr {
   border: 0;
-  border-top: 1px solid #d0d7de;
+  border-top-style: solid;
+  border-top-width: 1px;
   margin: 24px 0;
 }
 
@@ -158,28 +139,22 @@ img {
 
 /* Mark/Highlight */
 mark {
-  background: #fff8c5;
   padding: 2px 4px;
 }
 
-/* Inserted text */
+/* Inserted/Deleted text */
 ins {
   text-decoration: underline;
-  background: #d4f8d4;
 }
 
-/* Deleted text */
 del {
   text-decoration: line-through;
-  color: #82071e;
-  background: #ffebe9;
 }
 
 /* Footnotes */
 .footnotes {
   margin-top: 32px;
   padding-top: 16px;
-  border-top: 1px solid #d0d7de;
   font-size: 14px;
 }
 
