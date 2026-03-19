@@ -84,8 +84,11 @@ export function registerFeedRoutes(app: OpenAPIHono) {
       });
     }
 
-    // 设置 Content-Type 并返回 XML
+    // 设置 Content-Type 和缓存控制头
     c.header('Content-Type', 'application/xml; charset=utf-8');
+    c.header('Cache-Control', 'no-cache, no-store, must-revalidate');
+    c.header('Pragma', 'no-cache');
+    c.header('Expires', '0');
     return c.text(feed.rss2());
   });
 }
