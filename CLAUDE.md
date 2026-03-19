@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-**最后更新**: 2026-03-19
+**最后更新**: 2026-03-20
 
 ## 项目概述
 
@@ -216,8 +216,9 @@ src/
 | POST | `/api/channels` | ⚠️ | 创建频道（私有模式需超级管理员 Token） |
 | PUT | `/api/channels/:id` | ✅ | 更新频道配置 |
 | DELETE | `/api/channels/:id` | ✅ | 删除频道（默认频道不可删除） |
+| GET | `/api/admin/channels/active` | 🔒 | 活跃频道统计（仅超级管理员） |
 | GET | `/health` | ❌ | 健康检查 |
-| GET | `/swagger` | ❌ | API 文档 |
+| GET | `/doc` | ❌ | API 文档（Swagger UI） |
 
 ### 认证方式
 
@@ -225,6 +226,35 @@ src/
 ```bash
 Authorization: Bearer ch_xxx...        # 频道 Token
 Authorization: Bearer {AUTH_TOKEN}     # 超级管理员 Token
+```
+
+### 管理员接口
+
+**获取活跃频道统计**（需要超级管理员权限）:
+```bash
+curl -X GET "http://localhost:8765/api/admin/channels/active" \
+  -H "Authorization: Bearer {AUTH_TOKEN}"
+```
+
+响应示例:
+```json
+{
+  "last7Days": {
+    "count": 3,
+    "channels": [
+      {
+        "id": "xxx",
+        "name": "技术资讯",
+        "postCount": 15,
+        "lastPostDate": "2026-03-19T10:30:00.000Z"
+      }
+    ]
+  },
+  "last30Days": {
+    "count": 5,
+    "channels": [...]
+  }
+}
 ```
 
 ### 创建文章示例
@@ -326,11 +356,11 @@ curl -X POST "http://localhost:8765/api/channels/default/posts" \
     "name": "技术资讯",
     "description": "分享最新的技术动态",
     "theme": "github",
-    "language": "zh-CN",
-    "maxPosts": 100
+    "language": "zh-CN"
   }
   ```
 - 响应会包含自动生成的频道 ID 和 Token
+- **maxPosts**: 全局默认 100 篇，滚动删除旧文章（不可在频道级别配置）
 
 ### 鉴权逻辑
 - **标准认证方式**: 使用 `Authorization: Bearer <token>` 格式
@@ -436,9 +466,9 @@ curl -X POST "http://localhost:8765/api/channels/default/posts/upload" \
 5. 在 `src/routes/routes/index.ts` 中导出注册函数
 
 ### 添加新的主题
-1. 在 `themes.json` 中添加主题配置
-2. 定义 `name`, `description`, `styles` 字段
-3. `styles` 中的 CSS 属性使用驼峰命名（如 `fontSize`）
+1. 在 `src/styles/themes/` 创建 `{name}.css` 文件
+2. 只包含颜色和视觉样式（布局样式在 `base.css` 中）
+3. 在 `src/services/theme.ts` 的 `availableThemes` 数组中注册主题名称
 4. 重启服务加载新主题
 
 ### 修改数据库 Schema
@@ -489,6 +519,7 @@ sudo systemctl start agent2rss
 
 ## 版本历史
 
+- **2.0.4**: 添加活跃频道统计接口 (`GET /api/admin/channels/active`)、移除频道级别 maxPosts 配置、安全增强（时序攻击防护、XSS 防护）、RSS Feed 支持 ETag/Last-Modified/禁用缓存
 - **2.0.3**: 重构多主题系统，分离布局和颜色样式，支持 7 个主题（github/dark/minimal/modern/elegant/clean/spring）
 - **2.0.2**: 使用 juice 库替代手写样式内联，修复移动端溢出问题
 - **2.0.1**: 架构优化 - 统一鉴权中间件、修复 N+1 查询、添加时序安全比较、输入长度限制、类型安全增强
