@@ -46,14 +46,22 @@ export function createApp() {
       title: 'Agent2RSS API',
       version: '2.0.0',
       description:
-        '多频道 RSS 微服务 - 将任意内容转换为 RSS Feed\n\n## RSS Feed 访问\n\n获取频道 RSS Feed：`GET /channels/{channel-id}/rss.xml`\n\n示例：\n- http://localhost:8765/channels/default/rss.xml\n- http://localhost:8765/channels/tech/rss.xml',
+        '多频道 RSS 微服务 - 将任意内容转换为 RSS Feed\n\n## RSS Feed 访问\n\n获取频道 RSS Feed：`GET /channels/{channel-id}/rss.xml`\n\n示例：\n- http://localhost:8765/channels/default/rss.xml\n- http://localhost:8765/channels/tech/rss.xml\n\n## 认证说明\n\n大多数写操作需要 Bearer Token 认证：\n- **超级管理员 Token**: 环境变量 `AUTH_TOKEN`，拥有全局权限\n- **频道 Token**: 创建频道时生成的 `ch_xxx` 格式 Token，只能操作特定频道',
     },
     tags: [
       { name: 'System', description: '系统信息' },
       { name: 'Channels', description: '频道管理' },
       { name: 'Posts', description: '文章管理' },
       { name: 'RSS', description: 'RSS Feed 生成' },
+      { name: 'Admin', description: '管理员接口（需要超级管理员权限）' },
     ],
+  });
+
+  // 手动添加 securitySchemes 到 OpenAPI spec
+  app.openAPIRegistry.registerComponent('securitySchemes', 'bearerAuth', {
+    type: 'http',
+    scheme: 'bearer',
+    description: '使用频道 Token (ch_xxx) 或超级管理员 Token (AUTH_TOKEN)',
   });
 
   // Scalar API 文档 UI
@@ -62,6 +70,12 @@ export function createApp() {
     apiReference({
       spec: {
         url: '/swagger.json',
+      },
+      authentication: {
+        enabled: true,
+        http: {
+          bearer: true,
+        },
       },
     } as any)
   );

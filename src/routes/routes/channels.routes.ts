@@ -7,6 +7,7 @@ import {
   updateChannel,
   deleteChannel,
   readPosts,
+  getActiveChannelsStats,
 } from '../../services/storage.js';
 import { verifyToken } from '../../services/auth.js';
 import { CONFIG } from '../../config/index.js';
@@ -26,6 +27,7 @@ import {
   UnauthorizedResponse,
   NotFoundResponse,
   ForbiddenResponse,
+  ActiveChannelStatsSchema,
 } from '../schemas/index.js';
 
 // 获取所有频道路由
@@ -206,6 +208,38 @@ const deleteChannelRoute = createRoute({
   },
 });
 
+// 获取活跃频道统计路由（管理员专用）
+const getActiveChannelsRoute = createRoute({
+  method: 'get',
+  path: '/api/admin/channels/active',
+  tags: ['Admin'],
+  summary: '获取活跃频道统计',
+  description: '获取最近 7 天和 30 天内有文章发布的频道统计信息。需要超级管理员 Token 鉴权。',
+  security: [
+    {
+      bearerAuth: [],
+    },
+  ],
+  responses: {
+    200: {
+      content: {
+        'application/json': {
+          schema: ActiveChannelStatsSchema,
+        },
+      },
+      description: '活跃频道统计',
+    },
+    403: {
+      content: {
+        'application/json': {
+          schema: ForbiddenResponse,
+        },
+      },
+      description: '禁止访问（需要超级管理员权限）',
+    },
+  },
+});
+
 export function registerChannelRoutes(app: OpenAPIHono) {
   // 获取所有频道
   // @ts-expect-error OpenAPIHono strict type checking
@@ -373,5 +407,19 @@ export function registerChannelRoutes(app: OpenAPIHono) {
         error: (error as Error).message,
       }, 500);
     }
+  });
+
+  // 获取活跃频道统计（需要超级管理员权限）
+  app.openapi(getActiveChannelsRoute, async (c) => {
+    // 检查是否为超级管理员
+    if (!isSuperAdmin(c)) {
+      return c.json({
+        success: false,
+        error: 'Forbidden: Super admin token required',
+      }, 403);
+    }
+
+    const stats = await getActiveChannelsStats();
+    return c.json(stats, 200);
   });
 }

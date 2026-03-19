@@ -108,3 +108,27 @@ export const DeleteChannelSuccessSchema = z.object({
   success: z.literal(true).openapi({ example: true }),
   message: z.string().openapi({ example: 'Channel deleted' }),
 });
+
+// 活跃频道统计 - 单个频道信息
+const ActiveChannelItemSchema = z.object({
+  id: z.string().openapi({ example: '8cf83b0d-f856-4f7c-bd1c-4f6ca0338ece' }),
+  name: z.string().openapi({ example: '技术资讯' }),
+  postCount: z.number().openapi({ description: '文章数量', example: 15 }),
+  lastPostDate: z.string().openapi({ description: '最后发布时间 (ISO 8601)', example: '2026-03-19T10:30:00.000Z' }),
+});
+
+// 活跃频道统计 - 时间段统计
+const ActivePeriodSchema = z.object({
+  count: z.number().openapi({ description: '活跃频道数量', example: 3 }),
+  channels: z.array(ActiveChannelItemSchema).openapi({ description: '活跃频道列表' }),
+});
+
+// 活跃频道统计响应
+export const ActiveChannelStatsSchema = z.object({
+  last7Days: ActivePeriodSchema.openapi({
+    description: '最近 7 天活跃频道统计',
+  }),
+  last30Days: ActivePeriodSchema.openapi({
+    description: '最近 30 天活跃频道统计',
+  }),
+});

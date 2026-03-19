@@ -349,3 +349,97 @@ export async function deleteChannel(channelId: string): Promise<void> {
   const deleteQuery = db.query('DELETE FROM channels WHERE id = ?');
   deleteQuery.run(channelId);
 }
+
+/** 活跃频道统计结果 */
+export interface ActiveChannelStats {
+  last7Days: {
+    count: number;
+    channels: Array<{
+      id: string;
+      name: string;
+      postCount: number;
+      lastPostDate: string;
+    }>;
+  };
+  last30Days: {
+    count: number;
+    channels: Array<{
+      id: string;
+      name: string;
+      postCount: number;
+      lastPostDate: string;
+    }>;
+  };
+}
+
+/** 活跃频道查询结果 */
+interface ActiveChannelQueryResult {
+  id: string;
+  name: string;
+  postCount: number;
+  lastPostDate: string;
+}
+
+/**
+ * 获取活跃频道统计
+ * 查询最近 7 天和 30 天内有文章发布的频道
+ */
+export async function getActiveChannelsStats(): Promise<ActiveChannelStats> {
+  const db = getDatabase();
+
+  const now = new Date();
+  const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+  const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+  // 查询最近 7 天活跃频道
+  const query7Days = db.query<ActiveChannelQueryResult, [string]>(`
+    SELECT
+      c.id,
+      c.name,
+      COUNT(p.id) as postCount,
+      MAX(p.pub_date) as lastPostDate
+    FROM channels c
+    INNER JOIN posts p ON c.id = p.channel_id
+    WHERE p.pub_date >= ?
+    GROUP BY c.id
+    ORDER BY postCount DESC
+  `);
+
+  // 查询最近 30 天活跃频道
+  const query30Days = db.query<ActiveChannelQueryResult, [string]>(`
+    SELECT
+      c.id,
+      c.name,
+      COUNT(p.id) as postCount,
+      MAX(p.pub_date) as lastPostDate
+    FROM channels c
+    INNER JOIN posts p ON c.id = p.channel_id
+    WHERE p.pub_date >= ?
+    GROUP BY c.id
+    ORDER BY postCount DESC
+  `);
+
+  const channels7Days = query7Days.all(sevenDaysAgo.toISOString());
+  const channels30Days = query30Days.all(thirtyDaysAgo.toISOString());
+
+  return {
+    last7Days: {
+      count: channels7Days.length,
+      channels: channels7Days.map((row) => ({
+        id: row.id,
+        name: row.name,
+        postCount: row.postCount,
+        lastPostDate: row.lastPostDate,
+      })),
+    },
+    last30Days: {
+      count: channels30Days.length,
+      channels: channels30Days.map((row) => ({
+        id: row.id,
+        name: row.name,
+        postCount: row.postCount,
+        lastPostDate: row.lastPostDate,
+      })),
+    },
+  };
+}
