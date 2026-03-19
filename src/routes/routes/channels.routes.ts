@@ -12,6 +12,7 @@ import { verifyToken } from '../../services/auth.js';
 import { CONFIG } from '../../config/index.js';
 import { generateId, generateChannelToken } from '../../utils/index.js';
 import type { Channel } from '../../types/index.js';
+import { isSuperAdmin, extractBearerToken } from '../../middleware/auth.js';
 import {
   IdParamSchema,
   CreateChannelBodySchema,
@@ -205,19 +206,11 @@ const deleteChannelRoute = createRoute({
   },
 });
 
-// 从请求头提取 Bearer Token
-function extractBearerToken(c: any): string | undefined {
-  const authHeader = c.req.header('authorization');
-  if (!authHeader) return undefined;
-  return authHeader.replace('Bearer ', '');
-}
-
 export function registerChannelRoutes(app: OpenAPIHono) {
   // 获取所有频道
+  // @ts-expect-error OpenAPIHono strict type checking
   app.openapi(listChannelsRoute, async (c) => {
-    // @ts-expect-error OpenAPIHono strict type checking
-    const authToken = extractBearerToken(c);
-    const isSuperAdmin = authToken === CONFIG.authToken && CONFIG.authToken !== '';
+    const isSuperAdminFlag = isSuperAdmin(c);
 
     const channels = await readAllChannels();
     const channelList = [];
@@ -231,7 +224,7 @@ export function registerChannelRoutes(app: OpenAPIHono) {
         theme: channel.theme,
         language: channel.language,
         maxPosts: channel.maxPosts,
-        token: isSuperAdmin ? channel.token : undefined,
+        token: isSuperAdminFlag ? channel.token : undefined,
         postCount: posts.length,
         createdAt: channel.createdAt.toISOString(),
         updatedAt: channel.updatedAt.toISOString(),
@@ -242,60 +235,46 @@ export function registerChannelRoutes(app: OpenAPIHono) {
   });
 
   // 获取单个频道
+  // @ts-expect-error OpenAPIHono strict type checking
   app.openapi(getChannelRoute, async (c) => {
-    // @ts-expect-error OpenAPIHono strict type checking
     const { id } = c.req.valid('param');
     const channel = await readChannel(id);
 
     if (!channel) {
-      return c.json(
-        {
-          success: false,
-          error: `Channel "${id}" not found`,
-        },
-        404
-      );
+      return c.json({
+        success: false,
+        error: `Channel "${id}" not found`,
+      }, 404);
     }
 
     const authToken = extractBearerToken(c);
     const authResult = await verifyToken(authToken, id);
     const posts = await readPosts(id);
 
-    return c.json(
-      {
-        id: channel.id,
-        name: channel.name,
-        description: channel.description,
-        theme: channel.theme,
-        language: channel.language,
-        maxPosts: channel.maxPosts,
-        token: authResult.authorized ? channel.token : undefined,
-        postCount: posts.length,
-        createdAt: channel.createdAt.toISOString(),
-        updatedAt: channel.updatedAt.toISOString(),
-      },
-      200
-    );
+    return c.json({
+      id: channel.id,
+      name: channel.name,
+      description: channel.description,
+      theme: channel.theme,
+      language: channel.language,
+      maxPosts: channel.maxPosts,
+      token: authResult.authorized ? channel.token : undefined,
+      postCount: posts.length,
+      createdAt: channel.createdAt.toISOString(),
+      updatedAt: channel.updatedAt.toISOString(),
+    }, 200);
   });
 
   // 创建频道
   app.openapi(createChannelRoute, async (c) => {
-    // @ts-expect-error OpenAPIHono strict type checking
     const body = c.req.valid('json');
 
     // 私有模式：需要超级管理员验证
-    if (CONFIG.channelCreationMode === 'private') {
-      const authToken = extractBearerToken(c);
-
-      if (!authToken || authToken !== CONFIG.authToken) {
-        return c.json(
-          {
-            success: false,
-            error: 'Forbidden: Admin token required to create channels',
-          },
-          403
-        );
-      }
+    if (CONFIG.channelCreationMode === 'private' && !isSuperAdmin(c)) {
+      return c.json({
+        success: false,
+        error: 'Forbidden: Admin token required to create channels',
+      }, 403);
     }
 
     // 生成频道密钥
@@ -315,38 +294,32 @@ export function registerChannelRoutes(app: OpenAPIHono) {
 
     await createChannel(newChannel);
 
-    return c.json(
-      {
-        success: true,
-        message: 'Channel created. Please save your token.',
-        channel: {
-          id: newChannel.id,
-          name: newChannel.name,
-          token: channelToken,
-          postsUrl: `${CONFIG.feed.url}/api/channels/${newChannel.id}/posts`,
-          rssUrl: `${CONFIG.feed.url}/channels/${newChannel.id}/rss.xml`,
-        },
+    return c.json({
+      success: true,
+      message: 'Channel created. Please save your token.',
+      channel: {
+        id: newChannel.id,
+        name: newChannel.name,
+        token: channelToken,
+        postsUrl: `${CONFIG.feed.url}/api/channels/${newChannel.id}/posts`,
+        rssUrl: `${CONFIG.feed.url}/channels/${newChannel.id}/rss.xml`,
       },
-      201
-    );
+    }, 201);
   });
 
   // 更新频道
+  // @ts-expect-error OpenAPIHono strict type checking
   app.openapi(updateChannelRoute, async (c) => {
-    // @ts-expect-error OpenAPIHono strict type checking
     const { id } = c.req.valid('param');
     const body = c.req.valid('json');
     const authToken = extractBearerToken(c);
     const authResult = await verifyToken(authToken, id);
 
     if (!authResult.authorized) {
-      return c.json(
-        {
-          success: false,
-          error: 'Forbidden: Invalid token for this channel',
-        },
-        403
-      );
+      return c.json({
+        success: false,
+        error: 'Forbidden: Invalid token for this channel',
+      }, 403);
     }
 
     // 不允许修改 token
@@ -355,68 +328,52 @@ export function registerChannelRoutes(app: OpenAPIHono) {
     const updatedChannel = await readChannel(id);
 
     if (!updatedChannel) {
-      return c.json(
-        {
-          success: false,
-          error: `Channel "${id}" not found`,
-        },
-        404
-      );
+      return c.json({
+        success: false,
+        error: `Channel "${id}" not found`,
+      }, 404);
     }
 
-    return c.json(
-      {
-        success: true,
-        message: 'Channel updated',
-        channel: {
-          id: updatedChannel.id,
-          name: updatedChannel.name,
-          description: updatedChannel.description,
-          theme: updatedChannel.theme,
-          language: updatedChannel.language,
-          maxPosts: updatedChannel.maxPosts,
-          createdAt: updatedChannel.createdAt.toISOString(),
-          updatedAt: updatedChannel.updatedAt.toISOString(),
-        },
+    return c.json({
+      success: true,
+      message: 'Channel updated',
+      channel: {
+        id: updatedChannel.id,
+        name: updatedChannel.name,
+        description: updatedChannel.description,
+        theme: updatedChannel.theme,
+        language: updatedChannel.language,
+        maxPosts: updatedChannel.maxPosts,
+        createdAt: updatedChannel.createdAt.toISOString(),
+        updatedAt: updatedChannel.updatedAt.toISOString(),
       },
-      200
-    );
+    }, 200);
   });
 
   // 删除频道
   app.openapi(deleteChannelRoute, async (c) => {
-    // @ts-expect-error OpenAPIHono strict type checking
     const { id } = c.req.valid('param');
     const authToken = extractBearerToken(c);
     const authResult = await verifyToken(authToken, id);
 
     if (!authResult.authorized) {
-      return c.json(
-        {
-          success: false,
-          error: 'Forbidden: Invalid token for this channel',
-        },
-        403
-      );
+      return c.json({
+        success: false,
+        error: 'Forbidden: Invalid token for this channel',
+      }, 403);
     }
 
     try {
       await deleteChannel(id);
-      return c.json(
-        {
-          success: true,
-          message: 'Channel deleted',
-        },
-        200
-      );
+      return c.json({
+        success: true,
+        message: 'Channel deleted',
+      }, 200);
     } catch (error) {
-      return c.json(
-        {
-          success: false,
-          error: (error as Error).message,
-        },
-        500
-      );
+      return c.json({
+        success: false,
+        error: (error as Error).message,
+      }, 500);
     }
   });
 }

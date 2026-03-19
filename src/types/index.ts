@@ -34,6 +34,49 @@ export interface Theme {
 
 export type Themes = Record<string, Theme>;
 
+// ============== 数据库行类型 ==============
+
+/** 数据库中的频道行 */
+export interface DBChannel {
+  id: string;
+  name: string;
+  description: string;
+  theme: string | null;
+  language: string | null;
+  max_posts: number;
+  token: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/** 数据库中的文章行 */
+export interface DBPost {
+  id: string;
+  title: string;
+  link: string;
+  content: string;
+  content_markdown: string | null;
+  summary: string;
+  author: string | null;
+  pub_date: string;
+  channel_id: string;
+  idempotency_key: string | null;
+}
+
+/** 数据库中的标签行 */
+export interface DBPostTag {
+  post_id: string;
+  tag: string;
+}
+
+/** 数据库中的频道配置行 */
+export interface DBChannelConfig {
+  id: string;
+  max_posts: number | null;
+}
+
+// ============== 应用层类型 ==============
+
 // 存储数据类型
 export interface StorageData {
   posts: Post[];
@@ -60,7 +103,7 @@ export interface Post {
   title: string;
   link: string;
   content: string;
-  contentMarkdown: string;
+  contentMarkdown?: string;
   summary: string;
   tags?: string[];
   author?: string;

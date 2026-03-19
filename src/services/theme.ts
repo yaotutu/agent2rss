@@ -77,57 +77,87 @@ export function getAllThemes(): Themes {
 }
 
 /**
- * 为 HTML 添加内联样式
+ * 为 HTML 添加内联样式（优化版：使用单个正则表达式）
  */
 export function addInlineStyles(html: string, themeName: string = CONFIG.content.defaultTheme): string {
   const theme = getTheme(themeName).styles;
 
-  return html
-    // 代码块
-    .replace(/<pre>/g, `<pre style="${cleanStyle(theme.pre || '')};max-width:100%;overflow-x:auto">`)
-    .replace(/<code class="language-/g, `<code style="font-family:'SF Mono',Monaco,'Cascadia Code','Roboto Mono',Consolas,'Courier New',monospace;font-size:14px;line-height:1.5" class="language-`)
-    .replace(/<code>/g, `<code style="${cleanStyle(theme.codeInline || '')}">`)
+  // 预先清理所有样式
+  const styles = {
+    pre: cleanStyle(theme.pre || ''),
+    codeInline: cleanStyle(theme.codeInline || ''),
+    table: cleanStyle(theme.table || ''),
+    thead: cleanStyle(theme.thead || ''),
+    th: cleanStyle(theme.th || ''),
+    td: cleanStyle(theme.td || ''),
+    tr: cleanStyle(theme.tr || ''),
+    blockquote: cleanStyle(theme.blockquote || ''),
+    h1: cleanStyle(theme.h1 || ''),
+    h2: cleanStyle(theme.h2 || ''),
+    h3: cleanStyle(theme.h3 || ''),
+    h4: cleanStyle(theme.h4 || ''),
+    h5: cleanStyle(theme.h5 || ''),
+    h6: cleanStyle(theme.h6 || ''),
+    p: cleanStyle(theme.p || ''),
+    ul: cleanStyle(theme.ul || ''),
+    ol: cleanStyle(theme.ol || ''),
+    li: cleanStyle(theme.li || ''),
+    a: cleanStyle(theme.a || ''),
+    hr: cleanStyle(theme.hr || ''),
+    mark: cleanStyle(theme.mark || ''),
+    ins: cleanStyle(theme.ins || ''),
+    del: cleanStyle(theme.del || ''),
+    img: cleanStyle(theme.img || ''),
+  };
 
-    // 表格
-    .replace(/<table>/g, `<table style="${cleanStyle(theme.table || '')};width:100%;max-width:100%;table-layout:fixed;border-collapse:collapse">`)
-    .replace(/<thead>/g, `<thead style="${cleanStyle(theme.thead || '')}">`)
-    .replace(/<th>/g, `<th style="${cleanStyle(theme.th || '')};word-wrap:break-word;overflow-wrap:break-word">`)
-    .replace(/<td>/g, `<td style="${cleanStyle(theme.td || '')};word-wrap:break-word;overflow-wrap:break-word">`)
-    .replace(/<tr>/g, `<tr style="${cleanStyle(theme.tr || '')}">`)
+  // 使用单个正则表达式替换所有标签
+  const tagPattern = /<(pre|code|table|thead|th|td|tr|blockquote|h[1-6]|p|ul|ol|li|a|hr|mark|ins|del|img)(\s|>)/g;
 
-    // 引用块
-    .replace(/<blockquote>/g, `<blockquote style="${cleanStyle(theme.blockquote || '')};max-width:100%">`)
+  let result = html.replace(tagPattern, (match, tag, suffix) => {
+    const style = styles[tag as keyof typeof styles];
+    const additionalStyles: string[] = [];
 
-    // 标题
-    .replace(/<h1>/g, `<h1 style="${cleanStyle(theme.h1 || '')};max-width:100%">`)
-    .replace(/<h2>/g, `<h2 style="${cleanStyle(theme.h2 || '')};max-width:100%">`)
-    .replace(/<h3>/g, `<h3 style="${cleanStyle(theme.h3 || '')};max-width:100%">`)
-    .replace(/<h4>/g, `<h4 style="${cleanStyle(theme.h4 || '')};max-width:100%">`)
-    .replace(/<h5>/g, `<h5 style="${cleanStyle(theme.h5 || '')};max-width:100%">`)
-    .replace(/<h6>/g, `<h6 style="${cleanStyle(theme.h6 || '')};max-width:100%">`)
+    switch (tag) {
+      case 'pre':
+        additionalStyles.push('max-width:100%', 'overflow-x:auto');
+        break;
+      case 'code':
+        if (suffix === ' class="language-') {
+          // 代码块中的 code 标签
+          return `<code style="font-family:'SF Mono',Monaco,'Cascadia Code','Roboto Mono',Consolas,'Courier New',monospace;font-size:14px;line-height:1.5" class="language-`;
+        }
+        break;
+      case 'table':
+        additionalStyles.push('width:100%', 'max-width:100%', 'table-layout:fixed', 'border-collapse:collapse');
+        break;
+      case 'th':
+      case 'td':
+        additionalStyles.push('word-wrap:break-word', 'overflow-wrap:break-word');
+        break;
+      case 'blockquote':
+      case 'h1':
+      case 'h2':
+      case 'h3':
+      case 'h4':
+      case 'h5':
+      case 'h6':
+      case 'hr':
+        additionalStyles.push('max-width:100%');
+        break;
+      case 'p':
+        additionalStyles.push('max-width:100%', 'word-wrap:break-word');
+        break;
+      case 'img':
+        additionalStyles.push('max-width:100%', 'height:auto');
+        break;
+    }
 
-    // 段落和列表
-    .replace(/<p>/g, `<p style="${cleanStyle(theme.p || '')};max-width:100%;word-wrap:break-word">`)
-    .replace(/<ul>/g, `<ul style="${cleanStyle(theme.ul || '')}">`)
-    .replace(/<ol>/g, `<ol style="${cleanStyle(theme.ol || '')}">`)
-    .replace(/<li>/g, `<li style="${cleanStyle(theme.li || '')}">`)
+    const fullStyle = [style, ...additionalStyles].filter(Boolean).join(';');
+    return `<${tag} style="${fullStyle}"${suffix}`;
+  });
 
-    // 链接（先添加样式）
-    .replace(/<a /g, `<a style="${cleanStyle(theme.a || '')}" `)
+  // 处理外部链接
+  result = result.replace(/<a ([^>]*)href="(https?:\/\/[^"]+)"([^>]*)>/g, '<a $1href="$2"$3 rel="noopener noreferrer" target="_blank">');
 
-    // 链接（外部链接添加安全属性）
-    .replace(/<a ([^>]*)href="([^"]+)"([^>]*)>/g, (match, before, url, after) => {
-      const isExternal = url.startsWith('http://') || url.startsWith('https://');
-
-      if (isExternal) {
-        return `<a ${before}href="${url}"${after} rel="noopener noreferrer" target="_blank">`;
-      } else {
-        return match;
-      }
-    })
-    .replace(/<hr>/g, `<hr style="${cleanStyle(theme.hr || '')};max-width:100%">`)
-    .replace(/<mark>/g, `<mark style="${cleanStyle(theme.mark || '')}">`)
-    .replace(/<ins>/g, `<ins style="${cleanStyle(theme.ins || '')}">`)
-    .replace(/<del>/g, `<del style="${cleanStyle(theme.del || '')}">`)
-    .replace(/<img /g, `<img style="${cleanStyle(theme.img || '')};max-width:100%;height:auto" `);
+  return result;
 }

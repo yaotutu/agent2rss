@@ -2,13 +2,13 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-**最后更新**: 2026-03-18
+**最后更新**: 2026-03-19
 
 ## 项目概述
 
-Agent2RSS 是一个基于 Bun + ElysiaJS 的高性能 RSS 微服务，支持多频道管理、Markdown/HTML 内容处理、文件上传和主题系统。
+Agent2RSS 是一个基于 Bun + Hono 的高性能 RSS 微服务，支持多频道管理、Markdown/HTML 内容处理、文件上传和主题系统。
 
-**技术栈**: Bun runtime, ElysiaJS, SQLite, TypeScript, Zod
+**技术栈**: Bun runtime, Hono, SQLite, TypeScript, Zod, OpenAPI
 **API 版本**: 2.0.0
 
 ## 常用命令
@@ -52,7 +52,7 @@ curl -X POST "http://localhost:8765/api/channels/{channel-id}/posts" \
 curl http://localhost:8765/health
 
 # 查看 API 文档
-open http://localhost:8765/swagger
+open http://localhost:8765/doc
 
 # 创建频道（公开模式，ID 由服务端自动生成）
 curl -X POST http://localhost:8765/api/channels \
@@ -114,6 +114,8 @@ src/
 ├── config/
 │   ├── index.ts       # 配置聚合和导出
 │   └── env.ts         # 环境变量验证（Zod schema）
+├── middleware/
+│   └── auth.ts        # 鉴权中间件（channelAuth, requireChannel, checkChannelAuth 等辅助函数）
 ├── services/
 │   ├── database.ts    # SQLite 数据库管理（单例模式）
 │   ├── storage.ts     # 数据 CRUD 操作
@@ -122,9 +124,11 @@ src/
 │   ├── markdown.ts    # Markdown 转 HTML（markdown-it）
 │   └── logger.ts      # 日志服务（pino）
 ├── routes/
-│   └── index.ts       # 所有 HTTP 路由定义
+│   ├── index.ts       # 路由注册和应用配置
+│   ├── schemas/       # Zod schema 定义（含输入长度限制）
+│   └── routes/        # 路由处理函数
 ├── types/
-│   └── index.ts       # TypeScript 类型定义
+│   └── index.ts       # TypeScript 类型定义（Channel, Post, DBPost, DBChannel 等数据库行类型）
 ├── utils/
 │   └── index.ts       # 工具函数（ID 生成、IP 获取等）
 └── index.ts           # 应用入口
@@ -148,26 +152,32 @@ src/
 - 文章管理: `addPost()` 返回 `{id: string, isNew: boolean}`, `readPosts()` (支持按频道过滤)
 - 自动维护 `maxPosts` 限制（滚动删除旧文章）
 - **幂等性检查**: 在插入前检查 `idempotencyKey` 是否已存在
+- **性能优化**: 使用 LEFT JOIN + GROUP_CONCAT 避免 N+1 查询
+- **类型安全**: 使用 `PostQueryResult` 等类型定义数据库查询结果
 
-#### 3. 鉴权系统 (services/auth.ts)
+#### 3. 鉴权系统 (services/auth.ts + middleware/auth.ts)
 - **双层鉴权**:
   - 超级管理员 Token (`AUTH_TOKEN` 环境变量) - 全局权限
   - 频道 Token (创建频道时生成) - 频道级权限
 - `verifyToken()` 返回 `{ authorized: boolean, isSuperAdmin: boolean, error?: string }`
+- **安全增强**: 使用时序安全比较（timing-safe equal）防止时序攻击
+- **中间件辅助函数**: `checkChannelAuth()`, `isSuperAdmin()`, `extractBearerToken()` 统一鉴权逻辑
 
 #### 4. 主题系统 (services/theme.ts)
 - 主题配置文件: `themes.json`（根目录）
 - 内置主题: github, minimal, dark, modern, elegant, clean, spring
 - `addInlineStyles()`: 将主题样式注入 HTML 元素的 style 属性（兼容 RSS 阅读器）
+- **性能优化**: 使用单次正则遍历替代多次替换
 
 #### 5. Markdown 处理 (services/markdown.ts)
 - 使用 `markdown-it` 及 10+ 扩展插件
 - 支持: 表格、代码高亮、Emoji、脚注、上下标、标记、缩写等
 - `markdownToHtml()`: Markdown → HTML + 主题样式
 
-#### 6. 路由层 (routes/index.ts)
-- **Swagger 文档**: 自动生成 API 文档（`@elysiajs/swagger`）
-- **类型验证**: 使用 Elysia 的 `t` schema 进行请求/响应验证
+#### 6. 路由层 (routes/)
+- **OpenAPI 文档**: 自动生成 API 文档（`@hono/zod-openapi` + `@scalar/hono-api-reference`）
+- **类型验证**: 使用 Zod schema 进行请求/响应验证
+- **模块化设计**: 按功能分离路由（posts.routes.ts, channels.routes.ts 等）
 - **错误处理**: 全局 `onError` 处理器，统一错误响应格式
 
 ### 环境变量配置
@@ -330,17 +340,18 @@ curl -X POST "http://localhost:8765/api/channels/default/posts" \
 - 添加新主题后需要重启服务（主题在启动时加载）
 
 ### 内容处理
-- **必填字段**: `content`（文章内容，支持 Markdown 和 HTML）
-- **可选字段**: `title`（标题，未提供则自动从 Markdown 第一个 # 标题提取）、`idempotencyKey`（幂等性键，防止重复发布）
+- **必填字段**: `content`（文章内容，支持 Markdown 和 HTML，最大 1MB）
+- **可选字段**: `title`（标题，最大 500 字符，未提供则自动从 Markdown 第一个 # 标题提取）、`idempotencyKey`（幂等性键，防止重复发布，最大 255 字符）
 - 支持 Markdown 和 HTML 两种输入格式，可指定 `contentType` 或自动检测
 - Markdown 会自动应用主题样式
 - HTML 内容直接存储，不做额外处理
 - 摘要自动从 HTML 提取前 N 个字符（去除标签）
 - 链接未提供时自动生成内部永久链接：`{FEED_URL}/channels/{channelId}/posts/{postId}`
 - **幂等性**: 提供 `idempotencyKey` 时，相同频道内相同键的请求只会创建一次文章
+- **输入限制**: 标签最多 20 个，每个最大 100 字符；作者名最大 100 字符
 
 ### 错误处理
-- 使用 Elysia 的全局错误处理器统一响应格式
+- 使用 Hono 的全局错误处理器统一响应格式
 - 验证错误返回 422，未授权返回 401，禁止访问返回 403
 - 数据库错误会被捕获并返回 500
 - **JSON 解析错误** (400): 提供详细的错误诊断和解决方案
@@ -385,10 +396,11 @@ curl -X POST "http://localhost:8765/api/channels/default/posts/upload" \
 ```
 
 ### 添加新的 API 端点
-1. 在 `src/routes/index.ts` 中添加路由
-2. 使用 Elysia 的 `t` schema 定义请求/响应类型
-3. 在 `detail` 中添加 Swagger 文档信息
+1. 在 `src/routes/routes/` 下创建或修改路由文件
+2. 使用 `createRoute` + Zod schema 定义 OpenAPI 路由
+3. 在路由中添加 tags、summary、description 等文档信息
 4. 如需数据库操作，调用 `services/storage.ts` 中的函数
+5. 在 `src/routes/routes/index.ts` 中导出注册函数
 
 ### 添加新的主题
 1. 在 `themes.json` 中添加主题配置
@@ -444,4 +456,5 @@ sudo systemctl start agent2rss
 
 ## 版本历史
 
+- **2.0.1**: 架构优化 - 统一鉴权中间件、修复 N+1 查询、添加时序安全比较、输入长度限制、类型安全增强
 - **2.0.0**: 当前版本，支持多频道、幂等性、文件上传、主题系统

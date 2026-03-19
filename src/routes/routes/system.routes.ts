@@ -78,7 +78,6 @@ const serviceInfoRoute = createRoute({
 export function registerSystemRoutes(app: OpenAPIHono) {
   // 健康检查
   app.openapi(healthRoute, async (c) => {
-    // @ts-expect-error OpenAPIHono strict type checking
     try {
       const db = getDatabase();
       db.query('SELECT 1').get();
@@ -96,6 +95,7 @@ export function registerSystemRoutes(app: OpenAPIHono) {
       return c.json(
         {
           status: 'unhealthy' as const,
+          version: '2.0.0',
           error: (error as Error).message,
           timestamp: new Date().toISOString(),
         },
@@ -106,7 +106,6 @@ export function registerSystemRoutes(app: OpenAPIHono) {
 
   // 服务信息
   app.openapi(serviceInfoRoute, async (c) => {
-    // @ts-expect-error OpenAPIHono strict type checking
     return c.json({
       message: 'Agent2RSS Service',
       version: '2.0.0',

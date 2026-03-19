@@ -1,10 +1,10 @@
 import { createRoute, OpenAPIHono } from '@hono/zod-openapi';
 import { z } from '@hono/zod-openapi';
 import { addPost, readChannel, readPosts } from '../../services/storage.js';
-import { verifyToken } from '../../services/auth.js';
 import { CONFIG } from '../../config/index.js';
 import { markdownToHtml } from '../../services/markdown.js';
 import { generateSummary, generateId, extractTitleFromMarkdown } from '../../utils/index.js';
+import { checkChannelAuth } from '../../middleware/auth.js';
 import {
   ChannelIdParamSchema,
   CreatePostBodySchema,
@@ -133,62 +133,35 @@ const uploadPostRoute = createRoute({
   },
 });
 
-// 从请求头提取 Bearer Token
-function extractBearerToken(c: any): string | undefined {
-  const authHeader = c.req.header('authorization');
-  if (!authHeader) return undefined;
-  return authHeader.replace('Bearer ', '');
-}
-
 export function registerPostRoutes(app: OpenAPIHono) {
   // 创建文章
+  // @ts-expect-error OpenAPIHono strict type checking
   app.openapi(createPostRoute, async (c) => {
-    // @ts-expect-error OpenAPIHono strict type checking
     const { channelId } = c.req.valid('param');
     const body = c.req.valid('json');
-    const authToken = extractBearerToken(c);
 
-    // 鉴权检查
-    if (!authToken) {
-      return c.json(
-        {
-          success: false,
-          error: 'Authorization header missing or invalid',
-          details: {
-            expected: 'Authorization: Bearer <token>',
-            help: 'Provide a channel token (ch_xxx) or admin AUTH_TOKEN',
-          },
-        },
-        401
-      );
-    }
-
-    const authResult = await verifyToken(authToken, channelId);
-    if (!authResult.authorized) {
-      return c.json(
-        {
-          success: false,
-          error: authResult.error || 'Unauthorized',
-          details: authResult.details,
-        },
-        401
-      );
+    // 使用辅助函数进行鉴权检查
+    const authCheck = await checkChannelAuth(c, channelId);
+    if (!authCheck.authorized) {
+      const statusCode = (authCheck.status || 401) as 401 | 403 | 404;
+      return c.json({
+        success: false,
+        error: authCheck.error || 'Unauthorized',
+        details: authCheck.details,
+      }, statusCode);
     }
 
     // 验证频道是否存在
     const channel = await readChannel(channelId);
     if (!channel) {
-      return c.json(
-        {
-          success: false,
-          error: `Channel "${channelId}" not found`,
-          details: {
-            channelId,
-            help: 'Use GET /api/channels to list all available channels',
-          },
+      return c.json({
+        success: false,
+        error: `Channel "${channelId}" not found`,
+        details: {
+          channelId,
+          help: 'Use GET /api/channels to list all available channels',
         },
-        404
-      );
+      }, 404);
     }
 
     // 自动提取标题
@@ -239,71 +212,48 @@ export function registerPostRoutes(app: OpenAPIHono) {
 
     const result = await addPost(newPost, channelId);
 
-    return c.json(
-      {
-        success: true,
-        message: result.isNew
-          ? `Post created successfully in channel "${channelId}"`
-          : `Post already exists (idempotency key matched)`,
-        post: {
-          id: result.id,
-          title: newPost.title,
-          channel: channelId,
-          pubDate: newPost.pubDate.toISOString(),
-        },
-        isNew: result.isNew,
+    return c.json({
+      success: true,
+      message: result.isNew
+        ? `Post created successfully in channel "${channelId}"`
+        : `Post already exists (idempotency key matched)`,
+      post: {
+        id: result.id,
+        title: newPost.title,
+        channel: channelId,
+        pubDate: newPost.pubDate.toISOString(),
       },
-      200
-    );
+      isNew: result.isNew,
+    }, 200);
   });
 
   // 文件上传
+  // @ts-expect-error OpenAPIHono strict type checking
   app.openapi(uploadPostRoute, async (c) => {
-    // @ts-expect-error OpenAPIHono strict type checking
     const { channelId } = c.req.valid('param');
-    const authToken = extractBearerToken(c);
 
-    // 鉴权检查
-    if (!authToken) {
-      return c.json(
-        {
-          success: false,
-          error: 'Authorization header missing or invalid',
-          details: {
-            expected: 'Authorization: Bearer <token>',
-            help: 'Provide a channel token (ch_xxx) or admin AUTH_TOKEN',
-          },
-        },
-        401
-      );
-    }
-
-    const authResult = await verifyToken(authToken, channelId);
-    if (!authResult.authorized) {
-      return c.json(
-        {
-          success: false,
-          error: authResult.error || 'Unauthorized',
-          details: authResult.details,
-        },
-        401
-      );
+    // 使用辅助函数进行鉴权检查
+    const authCheck = await checkChannelAuth(c, channelId);
+    if (!authCheck.authorized) {
+      const statusCode = (authCheck.status || 401) as 401 | 403 | 404;
+      return c.json({
+        success: false,
+        error: authCheck.error || 'Unauthorized',
+        details: authCheck.details,
+      }, statusCode);
     }
 
     // 验证频道是否存在
     const channel = await readChannel(channelId);
     if (!channel) {
-      return c.json(
-        {
-          success: false,
-          error: `Channel "${channelId}" not found`,
-          details: {
-            channelId,
-            help: 'Use GET /api/channels to list all available channels',
-          },
+      return c.json({
+        success: false,
+        error: `Channel "${channelId}" not found`,
+        details: {
+          channelId,
+          help: 'Use GET /api/channels to list all available channels',
         },
-        404
-      );
+      }, 404);
     }
 
     try {
@@ -321,55 +271,46 @@ export function registerPostRoutes(app: OpenAPIHono) {
 
       // 检查文件
       if (!file || !(file instanceof File)) {
-        return c.json(
-          {
-            success: false,
-            error: 'Missing required field: file',
-            details: {
-              field: 'file',
-              issue: 'Required field missing or not a file',
-              expected: { file: 'markdown file' },
-              example: { file: 'article.md' },
-            },
+        return c.json({
+          success: false,
+          error: 'Missing required field: file',
+          details: {
+            field: 'file',
+            issue: 'Required field missing or not a file',
+            expected: { file: 'markdown file' },
+            example: { file: 'article.md' },
           },
-          400
-        );
+        }, 400);
       }
 
       // 验证文件类型
       const fileName = file.name;
       if (!fileName.toLowerCase().endsWith('.md') && !fileName.toLowerCase().endsWith('.markdown')) {
-        return c.json(
-          {
-            success: false,
-            error: 'Invalid file type',
-            details: {
-              field: 'file',
-              issue: 'File must have .md or .markdown extension',
-              provided: fileName.split('.').pop(),
-              expected: ['.md', '.markdown'],
-              example: 'article.md',
-            },
+        return c.json({
+          success: false,
+          error: 'Invalid file type',
+          details: {
+            field: 'file',
+            issue: 'File must have .md or .markdown extension',
+            provided: fileName.split('.').pop(),
+            expected: ['.md', '.markdown'],
+            example: 'article.md',
           },
-          400
-        );
+        }, 400);
       }
 
       // 读取文件内容
       const fileContent = await file.text();
       if (!fileContent.trim()) {
-        return c.json(
-          {
-            success: false,
-            error: 'File content is empty',
-            details: {
-              field: 'file',
-              issue: 'Uploaded file is empty',
-              example: 'File must contain markdown content',
-            },
+        return c.json({
+          success: false,
+          error: 'File content is empty',
+          details: {
+            field: 'file',
+            issue: 'Uploaded file is empty',
+            example: 'File must contain markdown content',
           },
-          400
-        );
+        }, 400);
       }
 
       // 自动提取标题
@@ -418,48 +359,39 @@ export function registerPostRoutes(app: OpenAPIHono) {
 
       const result = await addPost(newPost, channelId);
 
-      return c.json(
-        {
-          success: true,
-          message: result.isNew
-            ? `Post created successfully in channel "${channelId}" from uploaded file "${fileName}"`
-            : `Post already exists (idempotency key matched)`,
-          post: {
-            id: result.id,
-            title: newPost.title,
-            channel: channelId,
-            pubDate: newPost.pubDate.toISOString(),
-          },
-          isNew: result.isNew,
+      return c.json({
+        success: true,
+        message: result.isNew
+          ? `Post created successfully in channel "${channelId}" from uploaded file "${fileName}"`
+          : `Post already exists (idempotency key matched)`,
+        post: {
+          id: result.id,
+          title: newPost.title,
+          channel: channelId,
+          pubDate: newPost.pubDate.toISOString(),
         },
-        200
-      );
+        isNew: result.isNew,
+      }, 200);
     } catch (error) {
       if (error instanceof TypeError && error.message.includes('form data')) {
-        return c.json(
-          {
-            success: false,
-            error: 'Invalid multipart form data',
-            details: {
-              issue: 'Could not parse multipart form data',
-              expected: 'Correct multipart/form-data format with file field',
-              example: 'curl -X POST ... -F "file=@article.md"',
-            },
+        return c.json({
+          success: false,
+          error: 'Invalid multipart form data',
+          details: {
+            issue: 'Could not parse multipart form data',
+            expected: 'Correct multipart/form-data format with file field',
+            example: 'curl -X POST ... -F "file=@article.md"',
           },
-          400
-        );
+        }, 400);
       }
 
-      return c.json(
-        {
-          success: false,
-          error: 'Server error processing file upload',
-          details: {
-            error: error instanceof Error ? error.message : 'Unknown error',
-          },
+      return c.json({
+        success: false,
+        error: 'Server error processing file upload',
+        details: {
+          error: error instanceof Error ? error.message : 'Unknown error',
         },
-        500
-      );
+      }, 500);
     }
   });
 }

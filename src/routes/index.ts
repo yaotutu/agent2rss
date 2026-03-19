@@ -63,7 +63,7 @@ export function createApp() {
       spec: {
         url: '/swagger.json',
       },
-    }) as any
+    } as any)
   );
 
   // 注册路由模块

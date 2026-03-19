@@ -40,7 +40,6 @@ const getFeedRoute = createRoute({
 
 export function registerFeedRoutes(app: OpenAPIHono) {
   app.openapi(getFeedRoute, async (c) => {
-    // @ts-expect-error OpenAPIHono strict type checking
     const { id } = c.req.valid('param');
 
     // 读取频道配置
