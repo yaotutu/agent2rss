@@ -128,7 +128,11 @@ src/
 │   ├── schemas/       # Zod schema 定义（含输入长度限制）
 │   └── routes/        # 路由处理函数
 ├── styles/
-│   └── base.css       # 基础 CSS 样式（移动端友好，通过 juice 内联）
+│   ├── base.css       # 基础布局样式（所有主题共用）
+│   └── themes/        # 主题颜色样式
+│       ├── github.css
+│       ├── dark.css
+│       └── ...
 ├── types/
 │   └── index.ts       # TypeScript 类型定义（Channel, Post, DBPost, DBChannel 等数据库行类型）
 ├── utils/
@@ -165,11 +169,12 @@ src/
 - **安全增强**: 使用时序安全比较（timing-safe equal）防止时序攻击
 - **中间件辅助函数**: `checkChannelAuth()`, `isSuperAdmin()`, `extractBearerToken()` 统一鉴权逻辑
 
-#### 4. 主题系统 (services/theme.ts + styles/base.css)
-- CSS 文件: `src/styles/base.css`（移动端友好的响应式样式）
-- 使用 `juice` 库自动内联 CSS（兼容 RSS 阅读器）
-- 关键样式: `overflow-wrap: anywhere`, `word-break: break-word`, `white-space: pre-wrap`
-- 解决移动端长 URL/代码块横向滚动问题
+#### 4. 主题系统 (services/theme.ts + styles/)
+- **架构**: 布局样式 + 主题颜色 分离
+- **布局**: `src/styles/base.css` - 防止溢出、响应式（所有主题共用）
+- **颜色**: `src/styles/themes/*.css` - 各主题的配色方案
+- **内联**: 使用 `juice` 库自动合并并内联 CSS（兼容 RSS 阅读器）
+- **可用主题**: github（默认）、dark、minimal、modern、elegant、clean、spring
 
 #### 5. Markdown 处理 (services/markdown.ts)
 - 使用 `markdown-it` 及 10+ 扩展插件
@@ -337,14 +342,35 @@ curl -X POST "http://localhost:8765/api/channels/default/posts" \
 - 发布文章需要频道 Token 或超级管理员 Token
 
 ### 主题开发
-- CSS 样式定义在 `src/styles/base.css` 中
-- 使用 `juice` 库自动内联 CSS（RSS 阅读器不支持 `<style>` 标签）
-- 修改 CSS 后需要重启服务
-- 关键样式说明：
-  - `overflow-wrap: anywhere` - 允许在任意位置换行
-  - `word-break: break-word` - 单词内换行
-  - `white-space: pre-wrap` - 代码块自动换行
-  - `box-sizing: border-box` - 统一盒模型
+
+**目录结构**：
+```
+src/styles/
+├── base.css           # 布局样式（所有主题共用）
+└── themes/
+    ├── github.css     # GitHub 官方风格（默认）
+    ├── dark.css       # 深色模式
+    ├── minimal.css    # 极简风格
+    ├── modern.css     # 现代扁平
+    ├── elegant.css    # 优雅衬线
+    ├── clean.css      # 简洁干净
+    └── spring.css     # 清新绿色
+```
+
+**布局与颜色分离**：
+- `base.css`: 只包含布局样式（防止溢出、响应式）
+- `themes/*.css`: 只包含颜色和视觉样式
+
+**关键布局样式**（base.css，不要修改）：
+- `overflow-wrap: anywhere` - 允许在任意位置换行
+- `word-break: break-word` - 单词内换行
+- `white-space: pre-wrap` - 代码块自动换行
+- `box-sizing: border-box` - 统一盒模型
+
+**添加新主题**：
+1. 在 `src/styles/themes/` 创建 `{name}.css`
+2. 在 `src/services/theme.ts` 的 `availableThemes` 中注册
+3. 重启服务
 
 ### 内容处理
 - **必填字段**: `content`（文章内容，支持 Markdown 和 HTML，最大 1MB）
@@ -463,6 +489,7 @@ sudo systemctl start agent2rss
 
 ## 版本历史
 
+- **2.0.3**: 重构多主题系统，分离布局和颜色样式，支持 7 个主题（github/dark/minimal/modern/elegant/clean/spring）
 - **2.0.2**: 使用 juice 库替代手写样式内联，修复移动端溢出问题
 - **2.0.1**: 架构优化 - 统一鉴权中间件、修复 N+1 查询、添加时序安全比较、输入长度限制、类型安全增强
 - **2.0.0**: 支持多频道、幂等性、文件上传、主题系统
