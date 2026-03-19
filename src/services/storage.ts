@@ -176,22 +176,6 @@ export async function addPost(post: Post, channel: string): Promise<{ id: string
 }
 
 /**
- * 读取主题配置
- */
-export async function readThemes(): Promise<Record<string, any>> {
-  try {
-    const file = Bun.file(CONFIG.storage.themesFile);
-    const exists = await file.exists();
-    if (!exists) return {};
-
-    return await file.json();
-  } catch (error) {
-    console.error('Failed to read themes:', error);
-    return {};
-  }
-}
-
-/**
  * 读取频道配置
  */
 export async function readChannel(channelId: string): Promise<Channel | null> {

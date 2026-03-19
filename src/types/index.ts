@@ -1,35 +1,8 @@
-// 主题相关类型
-export interface ThemeStyles {
-  pre?: string;
-  codeInline?: string;
-  table?: string;
-  thead?: string;
-  th?: string;
-  td?: string;
-  tr?: string;
-  blockquote?: string;
-  h1?: string;
-  h2?: string;
-  h3?: string;
-  h4?: string;
-  h5?: string;
-  h6?: string;
-  p?: string;
-  ul?: string;
-  ol?: string;
-  li?: string;
-  a?: string;
-  hr?: string;
-  mark?: string;
-  ins?: string;
-  del?: string;
-  img?: string;
-}
-
+// 主题相关类型（简化版，使用 CSS 文件）
 export interface Theme {
   name: string;
   description: string;
-  styles: ThemeStyles;
+  cssFile?: string;
 }
 
 export type Themes = Record<string, Theme>;
