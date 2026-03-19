@@ -14,7 +14,7 @@ export interface AuthResult {
  * 使用 timing-safe 比较两个字符串
  * 防止时序攻击
  */
-function timingSafeEqual(a: string, b: string): boolean {
+export function timingSafeEqual(a: string, b: string): boolean {
   // 如果长度不同，仍然进行比较以防止时序泄露
   if (a.length !== b.length) {
     // 创建一个假的比较来保持恒定时间

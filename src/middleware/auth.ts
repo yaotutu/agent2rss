@@ -1,5 +1,5 @@
 import type { Context, MiddlewareHandler } from 'hono';
-import { verifyToken } from '../services/auth.js';
+import { verifyToken, timingSafeEqual } from '../services/auth.js';
 import { readChannel } from '../services/storage.js';
 import { CONFIG } from '../config/index.js';
 import type { Channel } from '../types/index.js';
@@ -156,7 +156,9 @@ export async function checkChannelAuth(
  */
 export function isSuperAdmin(c: Context): boolean {
   const authToken = extractBearerToken(c);
-  return authToken === CONFIG.authToken && CONFIG.authToken !== '';
+  return authToken !== undefined &&
+         CONFIG.authToken !== '' &&
+         timingSafeEqual(authToken, CONFIG.authToken);
 }
 
 /**
@@ -169,7 +171,7 @@ export function checkChannelCreationAuth(c: Context): AuthCheckResult {
 
   const authToken = extractBearerToken(c);
 
-  if (!authToken || authToken !== CONFIG.authToken) {
+  if (!authToken || !timingSafeEqual(authToken, CONFIG.authToken)) {
     return {
       authorized: false,
       error: 'Forbidden: Admin token required to create channels',
