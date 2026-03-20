@@ -8,7 +8,7 @@ import MarkdownItIns from 'markdown-it-ins';
 import MarkdownItAbbr from 'markdown-it-abbr';
 import MarkdownItFootnote from 'markdown-it-footnote';
 import MarkdownItDeflist from 'markdown-it-deflist';
-import { bare as markdownItEmoji } from 'markdown-it-emoji';
+import { full as markdownItEmoji } from 'markdown-it-emoji';
 import { CONFIG } from '../config/index.js';
 import { addInlineStyles } from './theme.js';
 import DOMPurify from 'isomorphic-dompurify';
